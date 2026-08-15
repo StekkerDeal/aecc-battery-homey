@@ -1,0 +1,88 @@
+{
+  "name": { "en": "AECC home battery", "nl": "AECC thuisbatterij" },
+  "class": "battery",
+  "platforms": ["local"],
+  "connectivity": ["lan"],
+  "discovery": "aecc",
+  "images": {
+    "small": "/drivers/battery/assets/images/small.png",
+    "large": "/drivers/battery/assets/images/large.png",
+    "xlarge": "/drivers/battery/assets/images/xlarge.png"
+  },
+  "capabilities": [
+    "measure_power",
+    "measure_battery",
+    "battery_charging_state",
+    "meter_power.charged",
+    "meter_power.discharged",
+    "target_power",
+    "target_power_mode",
+    "aecc_min_soc",
+    "aecc_max_soc",
+    "aecc_last_update",
+    "button.reset_meters"
+  ],
+  "capabilitiesOptions": {
+    "measure_power": {
+      "title": { "en": "Battery power", "nl": "Batterijvermogen" }
+    },
+    "meter_power.charged": {
+      "title": { "en": "Charged energy", "nl": "Geladen energie" }
+    },
+    "meter_power.discharged": {
+      "title": { "en": "Discharged energy", "nl": "Ontladen energie" }
+    },
+    "target_power": {
+      "min": -2400,
+      "max": 2400,
+      "step": 10,
+      "decimals": 0
+    },
+    "target_power_mode": {
+      "values": [
+        {
+          "id": "device",
+          "title": {
+            "en": "Self-consumption (AI)",
+            "nl": "Zelfconsumptie (AI)"
+          }
+        },
+        {
+          "id": "homey",
+          "title": { "en": "Homey control", "nl": "Homey-besturing" }
+        }
+      ]
+    },
+    "button.reset_meters": {
+      "maintenanceAction": true,
+      "title": { "en": "Reset meters", "nl": "Meters resetten" },
+      "desc": {
+        "en": "Resets the charged and discharged energy meters to zero. This breaks the continuity of this device's history in Homey Energy.",
+        "nl": "Zet de meters voor geladen en ontladen energie terug naar nul. Dit onderbreekt de continuïteit van de geschiedenis van dit apparaat in Homey Energie."
+      }
+    }
+  },
+  "energy": {
+    "homeBattery": true,
+    "meterPowerImportedCapability": "meter_power.charged",
+    "meterPowerExportedCapability": "meter_power.discharged"
+  },
+  "pair": [
+    { "id": "start" },
+    {
+      "id": "list_devices",
+      "template": "list_devices",
+      "navigation": { "next": "choose_brand" }
+    },
+    {
+      "id": "manual_entry",
+      "navigation": { "next": "choose_brand" }
+    },
+    {
+      "id": "choose_brand",
+      "navigation": { "next": "add_devices" }
+    },
+    { "id": "add_devices", "template": "add_devices" }
+  ],
+  "repair": [{ "id": "manual_entry" }]
+}

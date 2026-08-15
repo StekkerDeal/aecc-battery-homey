@@ -1,0 +1,13 @@
+{
+  "type": "number",
+  "title": { "en": "Discharge limit", "nl": "Ontlaadlimiet" },
+  "units": "%",
+  "getable": true,
+  "setable": true,
+  "min": 5,
+  "max": 50,
+  "step": 5,
+  "decimals": 0,
+  "uiComponent": "slider",
+  "insights": true
+}

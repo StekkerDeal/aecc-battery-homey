@@ -1,0 +1,146 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        padding: 20px;
+      }
+      .form-group {
+        margin-bottom: 16px;
+      }
+      .form-group label {
+        display: block;
+        margin-bottom: 6px;
+        font-weight: 600;
+      }
+      .form-group input {
+        width: 100%;
+        padding: 8px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        box-sizing: border-box;
+        font-size: 14px;
+      }
+      .hint {
+        color: #777;
+        font-size: 12px;
+        margin-top: 4px;
+      }
+      button {
+        width: 100%;
+        padding: 12px;
+        font-size: 15px;
+        border: none;
+        border-radius: 6px;
+        background: #0066cc;
+        color: #fff;
+        cursor: pointer;
+      }
+      button:disabled {
+        opacity: 0.6;
+        cursor: default;
+      }
+      .error-box {
+        display: none;
+        margin-top: 16px;
+        padding: 12px;
+        border-radius: 6px;
+        background: #fdecea;
+        border: 1px solid #f5c2c0;
+        color: #a12622;
+        font-size: 13px;
+        line-height: 1.4;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="form-group">
+      <label id="labelHost" for="host"></label>
+      <input type="text" id="host" placeholder="192.168.1.50" />
+    </div>
+
+    <div class="form-group">
+      <label id="labelPort" for="port"></label>
+      <input type="number" id="port" value="8080" min="1" max="65535" />
+    </div>
+
+    <div class="form-group">
+      <label id="labelName" for="name"></label>
+      <input type="text" id="name" />
+      <div class="hint" id="hintName"></div>
+    </div>
+
+    <button id="btnConnect" type="button"></button>
+
+    <div class="error-box" id="errorBox"></div>
+
+    <script type="application/javascript">
+      function onHomeyReady(Homey) {
+        Homey.setTitle(
+          Homey.__({ en: 'Enter the IP address', nl: 'Voer het IP-adres in' })
+        );
+
+        document.getElementById('labelHost').textContent = Homey.__({
+          en: 'Host',
+          nl: 'Host',
+        });
+        document.getElementById('labelPort').textContent = Homey.__({
+          en: 'Port',
+          nl: 'Poort',
+        });
+        document.getElementById('labelName').textContent = Homey.__({
+          en: 'Display name',
+          nl: 'Weergavenaam',
+        });
+        document.getElementById('hintName').textContent = Homey.__({
+          en: 'Optional. Shown as the device name in Homey.',
+          nl: 'Optioneel. Wordt getoond als apparaatnaam in Homey.',
+        });
+
+        const btnConnect = document.getElementById('btnConnect');
+        btnConnect.textContent = Homey.__({ en: 'Connect', nl: 'Verbinden' });
+
+        const errorBox = document.getElementById('errorBox');
+
+        btnConnect.addEventListener('click', async () => {
+          const host = document.getElementById('host').value.trim();
+          const port = Number(document.getElementById('port').value) || 8080;
+          const name = document.getElementById('name').value.trim();
+
+          if (!host) {
+            errorBox.textContent = Homey.__({
+              en: 'Enter a host or IP address.',
+              nl: 'Voer een host of IP-adres in.',
+            });
+            errorBox.style.display = 'block';
+            return;
+          }
+
+          errorBox.style.display = 'none';
+          btnConnect.disabled = true;
+          Homey.showLoadingOverlay();
+
+          try {
+            await Homey.emit('manual_connect', { host, port, name });
+            Homey.hideLoadingOverlay();
+            Homey.nextView();
+          } catch (error) {
+            Homey.hideLoadingOverlay();
+            btnConnect.disabled = false;
+            errorBox.textContent =
+              (error && error.message) ||
+              String(error) ||
+              Homey.__({
+                en: 'Could not connect to the battery.',
+                nl: 'Kan geen verbinding maken met de batterij.',
+              });
+            errorBox.style.display = 'block';
+          }
+        });
+      }
+    </script>
+  </body>
+</html>

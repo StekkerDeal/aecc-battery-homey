@@ -1,0 +1,167 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        padding: 20px;
+      }
+      .form-group {
+        margin-bottom: 16px;
+      }
+      .form-group label {
+        display: block;
+        margin-bottom: 6px;
+        font-weight: 600;
+      }
+      .form-group input,
+      .form-group select {
+        width: 100%;
+        padding: 8px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        box-sizing: border-box;
+        font-size: 14px;
+      }
+      .hint {
+        color: #777;
+        font-size: 12px;
+        margin-top: 4px;
+      }
+      .row {
+        display: flex;
+        gap: 12px;
+      }
+      .row .form-group {
+        flex: 1;
+      }
+      button {
+        width: 100%;
+        padding: 12px;
+        font-size: 15px;
+        border: none;
+        border-radius: 6px;
+        background: #0066cc;
+        color: #fff;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="form-group">
+      <label id="labelBrand" for="brand"></label>
+      <select id="brand">
+        <option value="lunergy">Lunergy</option>
+        <option value="sunpura">Sunpura</option>
+        <option value="voltdeer">Voltdeer</option>
+        <option value="aeg">AEG</option>
+        <option value="aferiy">AFERIY</option>
+        <option value="accumate">AccuMate</option>
+        <option value="jet">JET</option>
+        <option value="oscal">Oscal</option>
+        <option value="other" id="optionOther" selected></option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label id="labelModel" for="model"></label>
+      <input type="text" id="model" />
+      <div class="hint" id="hintModel"></div>
+    </div>
+
+    <div class="row">
+      <div class="form-group">
+        <label id="labelMaxCharge" for="maxChargePower"></label>
+        <input
+          type="number"
+          id="maxChargePower"
+          value="800"
+          min="100"
+          max="2400"
+        />
+      </div>
+      <div class="form-group">
+        <label id="labelMaxDischarge" for="maxDischargePower"></label>
+        <input
+          type="number"
+          id="maxDischargePower"
+          value="800"
+          min="100"
+          max="2400"
+        />
+      </div>
+    </div>
+
+    <button id="btnNext" type="button"></button>
+
+    <script type="application/javascript">
+      function onHomeyReady(Homey) {
+        Homey.setTitle(Homey.__({ en: 'Choose brand', nl: 'Kies merk' }));
+
+        document.getElementById('labelBrand').textContent = Homey.__({
+          en: 'Brand',
+          nl: 'Merk',
+        });
+        document.getElementById('optionOther').textContent = Homey.__({
+          en: 'Other',
+          nl: 'Overig',
+        });
+        document.getElementById('labelModel').textContent = Homey.__({
+          en: 'Model',
+          nl: 'Model',
+        });
+        document.getElementById('hintModel').textContent = Homey.__({
+          en: 'Optional. The model name printed on the battery or datalogger.',
+          nl: 'Optioneel. De modelnaam die op de batterij of datalogger staat vermeld.',
+        });
+        document.getElementById('labelMaxCharge').textContent = Homey.__({
+          en: 'Max charge power (W)',
+          nl: 'Max. laadvermogen (W)',
+        });
+        document.getElementById('labelMaxDischarge').textContent = Homey.__({
+          en: 'Max discharge power (W)',
+          nl: 'Max. ontlaadvermogen (W)',
+        });
+
+        const btnNext = document.getElementById('btnNext');
+        btnNext.textContent = Homey.__({ en: 'Next', nl: 'Volgende' });
+
+        btnNext.addEventListener('click', async () => {
+          const brand = document.getElementById('brand').value;
+          const model = document.getElementById('model').value.trim();
+          const maxChargePower =
+            Number(document.getElementById('maxChargePower').value) || 800;
+          const maxDischargePower =
+            Number(document.getElementById('maxDischargePower').value) || 800;
+
+          btnNext.disabled = true;
+          Homey.showLoadingOverlay();
+
+          try {
+            await Homey.emit('set_brand', {
+              brand,
+              model,
+              max_charge_power: maxChargePower,
+              max_discharge_power: maxDischargePower,
+            });
+            Homey.hideLoadingOverlay();
+            Homey.nextView();
+          } catch (error) {
+            Homey.hideLoadingOverlay();
+            btnNext.disabled = false;
+            Homey.alert(
+              (error && error.message) ||
+                String(error) ||
+                Homey.__({
+                  en: 'Could not save the brand.',
+                  nl: 'Kon het merk niet opslaan.',
+                })
+            );
+          }
+        });
+      }
+    </script>
+  </body>
+</html>

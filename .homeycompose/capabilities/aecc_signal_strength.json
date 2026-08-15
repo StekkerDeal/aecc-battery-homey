@@ -1,0 +1,9 @@
+{
+  "type": "number",
+  "title": { "en": "WiFi signal", "nl": "WiFi signaal" },
+  "units": "dBm",
+  "getable": true,
+  "setable": false,
+  "uiComponent": "sensor",
+  "insights": true
+}

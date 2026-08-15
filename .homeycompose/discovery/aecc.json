@@ -1,0 +1,17 @@
+{
+  "type": "mdns-sd",
+  "mdns-sd": { "name": "http", "protocol": "tcp" },
+  "id": "{{txt.s_sn}}",
+  "conditions": [
+    [
+      {
+        "field": "name",
+        "match": { "type": "regex", "value": "^SXD-mDNS-IF" }
+      },
+      {
+        "field": "txt.s_port",
+        "match": { "type": "regex", "value": "^[0-9]+$" }
+      }
+    ]
+  ]
+}
