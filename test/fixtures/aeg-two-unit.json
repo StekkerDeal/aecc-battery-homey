@@ -1,0 +1,67 @@
+{
+  "_note": "Hand built, not captured from a real device. Models a two-unit AEG Storage_list, field7=0 in register 3003 per the AEG slot quirk documented in docs/protocol.md.",
+  "last_poll": {
+    "Response": "EnergyParameter",
+    "SerialNumber": 1,
+    "Target": "HA",
+    "Storage_list": [
+      {
+        "DevAddr": 1,
+        "StorageSN": "SIMSN0000000201",
+        "StorageStatus": 1,
+        "PvChargingPower": 0,
+        "AcChargingPower": 4000,
+        "BatterySoc": 45,
+        "BatteryDischargingPower": 0,
+        "AcInActivePower": -4000,
+        "OffGridLoadPower": 0,
+        "BatteryChargingPower": 3950,
+        "PvStringCount": 0,
+        "Pv1Power": 0,
+        "Pv2Power": 0
+      },
+      {
+        "DevAddr": 2,
+        "StorageSN": "SIMSN0000000202",
+        "StorageStatus": 1,
+        "PvChargingPower": 0,
+        "AcChargingPower": 4000,
+        "BatterySoc": 47,
+        "BatteryDischargingPower": 0,
+        "AcInActivePower": -4000,
+        "OffGridLoadPower": 0,
+        "BatteryChargingPower": 3950,
+        "PvStringCount": 0,
+        "Pv1Power": 0,
+        "Pv2Power": 0
+      }
+    ],
+    "SSumInfoList": {
+      "ControlEnableStatus": 1,
+      "MeterTotalActivePower": 0,
+      "TotalPVPower": 0,
+      "TotalPVChargePower": 0,
+      "TotalACChargePower": 800,
+      "AverageBatteryAverageSOC": 46,
+      "TotalBatteryOutputPower": 0,
+      "TotalGridOutputPower": -800,
+      "TotalBackUpPower": 0,
+      "TotalChargePower": 790
+    }
+  },
+  "registers": {
+    "3000": "1",
+    "3003": "1,00:00,23:59,-800,0,6,0,0,0,80,10",
+    "3020": "6",
+    "3021": "0",
+    "3022": "0",
+    "3023": "10",
+    "3024": "80",
+    "3030": "1",
+    "3039": "2400",
+    "8": "SIMSN0000000201",
+    "20": "AEGX0000",
+    "21": "1.0.0.0.0.1",
+    "76": "-52"
+  }
+}
