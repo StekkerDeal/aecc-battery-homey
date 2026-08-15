@@ -68,5 +68,45 @@ describe('AeccSession drift check', () => {
     );
 
     expect(sim.registers.get('3003')).toBe(expectedSlot);
+
+    // The drift event carries both values signed in the Homey convention, so
+    // the device layer never has to infer a correction from write events.
+    const drift = events.filter(e => e.type === 'drift');
+    expect(drift).toHaveLength(1);
+    expect(drift[0]).toEqual({
+      type: 'drift',
+      expectedPowerW: 350,
+      foundPowerW: 0,
+    });
+  }, 15000);
+
+  it('stays silent when the setpoint has not drifted', async () => {
+    sim = await AeccSimulator.start({
+      scenario: jetSingleUnit as unknown as Scenario,
+      port: 0,
+    });
+    session = new AeccSession({
+      host: '127.0.0.1',
+      port: sim.port,
+      brand: 'jet',
+      limits: { maxChargeW: 800, maxDischargeW: 800 },
+      scheduler: systemScheduler,
+      pollIntervalMs: 2000,
+      verifyIntervalMs: 2000,
+      ...FAST_OPTS,
+    });
+
+    await session.start();
+    expect(await session.setTargetPower(350)).toBe(true);
+
+    const events: SessionEvent[] = [];
+    session.subscribe(e => events.push(e));
+
+    // Let at least two drift checks run against an untouched slot.
+    await waitFor(
+      () => events.filter(e => e.type === 'snapshot').length >= 3,
+      8000
+    );
+    expect(events.filter(e => e.type === 'drift')).toHaveLength(0);
   }, 15000);
 });

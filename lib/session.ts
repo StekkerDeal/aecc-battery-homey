@@ -135,7 +135,11 @@ export type SessionEvent =
       ok: boolean;
       attempts: number;
       verify: VerifyEntry[] | null;
-    };
+    }
+  // Emitted only by the periodic drift check, so consumers never have to infer
+  // a correction from the surrounding write events. Both values are signed in
+  // the Homey convention: positive charges, negative discharges.
+  | { type: 'drift'; expectedPowerW: number; foundPowerW: number };
 
 export type SessionListener = (event: SessionEvent) => void;
 
@@ -535,6 +539,19 @@ export class AeccSession {
       decoded.direction !== expectedDirection ||
       (expectedDirection !== 'idle' && decoded.powerW !== expectedPowerW);
     if (!disagrees) return;
+
+    const signed = (direction: Direction, magnitude: number): number =>
+      direction === 'charge'
+        ? magnitude
+        : direction === 'discharge'
+          ? -magnitude
+          : 0;
+
+    this.emit({
+      type: 'drift',
+      expectedPowerW: signed(expectedDirection, expectedPowerW),
+      foundPowerW: signed(decoded.direction, decoded.powerW),
+    });
 
     await this.reapplySetpoint();
   }
