@@ -4,7 +4,10 @@
   "compatibility": ">=12.13.0",
   "sdk": 3,
   "platforms": ["local"],
-  "name": { "en": "AECC Battery", "nl": "AECC Batterij" },
+  "name": {
+    "en": "AECC Plug-and-Play Battery",
+    "nl": "AECC Plug-in Thuisbatterij"
+  },
   "description": {
     "en": "Get more out of every stored kilowatt-hour",
     "nl": "Haal meer uit elke opgeslagen kilowattuur"

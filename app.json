@@ -8,8 +8,8 @@
     "local"
   ],
   "name": {
-    "en": "AECC Battery",
-    "nl": "AECC Batterij"
+    "en": "AECC Plug-and-Play Battery",
+    "nl": "AECC Plug-in Thuisbatterij"
   },
   "description": {
     "en": "Get more out of every stored kilowatt-hour",
@@ -34,6 +34,305 @@
   "homepage": "https://stekkerdeal.nl",
   "bugs": {
     "url": "https://github.com/StekkerDeal/aecc-battery-homey/issues"
+  },
+  "flow": {
+    "triggers": [
+      {
+        "id": "control_write_failed",
+        "title": {
+          "en": "Control command failed",
+          "nl": "Besturingscommando mislukt"
+        },
+        "hint": {
+          "en": "Fires once all retries are exhausted without an acknowledgement from the battery.",
+          "nl": "Wordt geactiveerd nadat alle nieuwe pogingen zijn uitgeput zonder bevestiging van de batterij."
+        },
+        "tokens": [
+          {
+            "name": "operation",
+            "type": "string",
+            "title": {
+              "en": "Operation",
+              "nl": "Bewerking"
+            }
+          },
+          {
+            "name": "attempts",
+            "type": "number",
+            "title": {
+              "en": "Attempts",
+              "nl": "Pogingen"
+            }
+          }
+        ],
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=battery"
+          }
+        ]
+      },
+      {
+        "id": "control_drift_corrected",
+        "title": {
+          "en": "Setpoint drift corrected",
+          "nl": "Afwijking setpoint hersteld"
+        },
+        "hint": {
+          "en": "Fires when the battery's actual setpoint no longer matched what was last written and this app restored it.",
+          "nl": "Wordt geactiveerd wanneer het werkelijke setpoint van de batterij niet meer overeenkwam met wat laatst is geschreven en deze app het heeft hersteld."
+        },
+        "tokens": [
+          {
+            "name": "expected",
+            "type": "number",
+            "title": {
+              "en": "Expected power",
+              "nl": "Verwacht vermogen"
+            }
+          },
+          {
+            "name": "found",
+            "type": "number",
+            "title": {
+              "en": "Found power",
+              "nl": "Gevonden vermogen"
+            }
+          }
+        ],
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=battery"
+          }
+        ]
+      },
+      {
+        "id": "readings_became_stale",
+        "title": {
+          "en": "Readings became stale",
+          "nl": "Metingen verouderd"
+        },
+        "hint": {
+          "en": "Fires once when polling stops producing fresh data, not repeatedly while the battery stays unreachable.",
+          "nl": "Wordt eenmalig geactiveerd wanneer het pollen geen verse data meer oplevert, niet herhaaldelijk zolang de batterij onbereikbaar blijft."
+        },
+        "tokens": [
+          {
+            "name": "seconds",
+            "type": "number",
+            "title": {
+              "en": "Seconds since last reading",
+              "nl": "Seconden sinds laatste meting"
+            }
+          }
+        ],
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=battery"
+          }
+        ]
+      }
+    ],
+    "conditions": [
+      {
+        "id": "readings_are_fresh",
+        "title": {
+          "en": "Data !{{is|is not}} fresh",
+          "nl": "Data !{{is|is niet}} vers"
+        },
+        "titleFormatted": {
+          "en": "Data !{{is|is not}} fresher than [[seconds]] seconds old",
+          "nl": "Data !{{is|is niet}} verser dan [[seconds]] seconden oud"
+        },
+        "hint": {
+          "en": "Fresh means a successful reading arrived within the given number of seconds. Use this to guard other actions from running on stale data.",
+          "nl": "Vers betekent dat er binnen het opgegeven aantal seconden een succesvolle meting is binnengekomen. Gebruik dit om andere acties te beschermen tegen verouderde data."
+        },
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=battery"
+          },
+          {
+            "name": "seconds",
+            "type": "number",
+            "title": {
+              "en": "Seconds",
+              "nl": "Seconden"
+            },
+            "min": 5,
+            "max": 3600,
+            "step": 5
+          }
+        ]
+      }
+    ],
+    "actions": [
+      {
+        "id": "set_charge_power",
+        "title": {
+          "en": "Charge at a set power",
+          "nl": "Laad op met een ingesteld vermogen"
+        },
+        "titleFormatted": {
+          "en": "Charge at [[power]]",
+          "nl": "Laad op met [[power]]"
+        },
+        "hint": {
+          "en": "Sets the mode to Homey control and charges at this power. Also callable from HomeyScript.",
+          "nl": "Zet de modus op Homey-besturing en laadt op met dit vermogen. Ook aanroepbaar vanuit HomeyScript."
+        },
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=battery"
+          },
+          {
+            "name": "power",
+            "type": "number",
+            "title": {
+              "en": "Power",
+              "nl": "Vermogen"
+            },
+            "min": 0,
+            "max": 2400,
+            "step": 10,
+            "label": {
+              "en": "W",
+              "nl": "W"
+            }
+          }
+        ]
+      },
+      {
+        "id": "set_discharge_power",
+        "title": {
+          "en": "Discharge at a set power",
+          "nl": "Ontlaad met een ingesteld vermogen"
+        },
+        "titleFormatted": {
+          "en": "Discharge at [[power]]",
+          "nl": "Ontlaad met [[power]]"
+        },
+        "hint": {
+          "en": "Sets the mode to Homey control and discharges at this power. Also callable from HomeyScript.",
+          "nl": "Zet de modus op Homey-besturing en ontlaadt met dit vermogen. Ook aanroepbaar vanuit HomeyScript."
+        },
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=battery"
+          },
+          {
+            "name": "power",
+            "type": "number",
+            "title": {
+              "en": "Power",
+              "nl": "Vermogen"
+            },
+            "min": 0,
+            "max": 2400,
+            "step": 10,
+            "label": {
+              "en": "W",
+              "nl": "W"
+            }
+          }
+        ]
+      },
+      {
+        "id": "stop_battery",
+        "title": {
+          "en": "Stop",
+          "nl": "Stop"
+        },
+        "hint": {
+          "en": "Holds an active 0W setpoint with energy management still enabled, unlike switching to self-consumption mode which hands control back to the battery.",
+          "nl": "Houdt een actief setpoint van 0W aan met energiebeheer nog steeds ingeschakeld, in tegenstelling tot overschakelen naar zelfconsumptiemodus waarbij de besturing wordt teruggegeven aan de batterij."
+        },
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=battery"
+          }
+        ]
+      },
+      {
+        "id": "set_soc_limits",
+        "title": {
+          "en": "Set charge and discharge limits",
+          "nl": "Stel oplaad- en ontlaadlimiet in"
+        },
+        "titleFormatted": {
+          "en": "Set discharge limit to [[min_soc]] and charge limit to [[max_soc]]",
+          "nl": "Stel ontlaadlimiet in op [[min_soc]] en oplaadlimiet op [[max_soc]]"
+        },
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=battery"
+          },
+          {
+            "name": "min_soc",
+            "type": "number",
+            "title": {
+              "en": "Discharge limit",
+              "nl": "Ontlaadlimiet"
+            },
+            "min": 5,
+            "max": 50,
+            "step": 5,
+            "label": {
+              "en": "%",
+              "nl": "%"
+            }
+          },
+          {
+            "name": "max_soc",
+            "type": "number",
+            "title": {
+              "en": "Charge limit",
+              "nl": "Oplaadlimiet"
+            },
+            "min": 50,
+            "max": 100,
+            "step": 5,
+            "label": {
+              "en": "%",
+              "nl": "%"
+            }
+          }
+        ]
+      },
+      {
+        "id": "reapply_setpoint",
+        "title": {
+          "en": "Reapply the setpoint",
+          "nl": "Setpoint opnieuw toepassen"
+        },
+        "hint": {
+          "en": "Rewrites the current target power to the battery without changing its value. Useful as a recovery step after a failed control command.",
+          "nl": "Schrijft het huidige doelvermogen opnieuw naar de batterij zonder de waarde te wijzigen. Handig als herstelstap na een mislukt besturingscommando."
+        },
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=battery"
+          }
+        ]
+      }
+    ]
   },
   "drivers": [
     {
