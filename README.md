@@ -12,16 +12,16 @@ A Homey app for **local TCP control** of AECC-platform plug-in home batteries: S
 
 Homey-specific testing so far covers only the JET GreenARK Pro, this app's development device. The other rows describe confirmation status on the Home Assistant integration, which speaks the identical protocol; compatibility with this app is expected but not yet independently confirmed on Homey for those. If you try one, please open an issue so this table can be updated.
 
-| Brand    | Model              | Tested on Homey | Notes                                                                                                                                                                                                                             |
-| -------- | ------------------ | --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| JET      | GreenARK Pro       | Yes             | Development device for this app                                                                                                                                                                                                   |
-| Sunpura  | S2400              | No              | Fully tested on the Home Assistant integration                                                                                                                                                                                    |
-| Lunergy  | Hub 2400 AC        | No              | Fully tested on the Home Assistant integration                                                                                                                                                                                    |
-| AEG      | Solarcube          | No              | Partial on the Home Assistant integration: monitoring and single-unit control work, multi-unit stacks have an open control limitation, see [`aecc-battery-local#16`](https://github.com/StekkerDeal/aecc-battery-local/issues/16) |
-| Voltdeer | SR5000             | No              | Community confirmed on the Home Assistant integration                                                                                                                                                                             |
-| AFERIY   | PS240              | No              | Community confirmed on the Home Assistant integration                                                                                                                                                                             |
-| AccuMate | Plug-In Battery    | No              | Community confirmed on the Home Assistant integration                                                                                                                                                                             |
-| Oscal    | Power Storage 2000 | No              | Community confirmed on the Home Assistant integration                                                                                                                                                                             |
+| Brand    | Model              | Tested on Homey | Notes                                                 |
+| -------- | ------------------ | --------------- | ----------------------------------------------------- |
+| JET      | GreenARK Pro       | Yes             | Development device for this app                       |
+| Sunpura  | S2400              | No              | Fully tested on the Home Assistant integration        |
+| Lunergy  | Hub 2400 AC        | No              | Fully tested on the Home Assistant integration        |
+| AEG      | Solarcube          | No              | Community confirmed on the Home Assistant integration |
+| Voltdeer | SR5000             | No              | Community confirmed on the Home Assistant integration |
+| AFERIY   | PS240              | No              | Community confirmed on the Home Assistant integration |
+| AccuMate | Plug-In Battery    | No              | Community confirmed on the Home Assistant integration |
+| Oscal    | Power Storage 2000 | No              | Community confirmed on the Home Assistant integration |
 
 ## Requirements
 
@@ -72,7 +72,7 @@ Both directions are bounded by the **Max charge power** / **Max discharge power*
 
 **The vendor app has a separate cap this app cannot reach.** Its "On Grid Output" setting (factory default 800W) limits what the inverter actually delivers, and is not exposed over local TCP at all. Raising the device settings above 800W in this app is not enough on its own: to discharge above 800W, "On Grid Output" must also be raised once, in the vendor app, per device.
 
-**No multi-unit support in this version.** A real master/slave stack shares a single datalogger and a single IP address, and the slave unit does not serve the local API at all, so it cannot be split into separate Homey devices. Such a stack pairs as **one** Homey device showing whole-stack totals, not one device per physical unit. Two batteries that are _not_ stacked, each registered under its own vendor account, have their own IP addresses and pair as two independent Homey devices normally. See [`aecc-battery-local#16`](https://github.com/StekkerDeal/aecc-battery-local/issues/16) for the open master/slave control limitation on AEG stacks specifically.
+**No multi-unit support in this version.** A real master/slave stack shares a single datalogger and a single IP address, and the slave unit does not serve the local API at all, so it cannot be split into separate Homey devices. Such a stack pairs as **one** Homey device showing whole-stack totals, not one device per physical unit. Two batteries that are _not_ stacked, each registered under its own vendor account, have their own IP addresses and pair as two independent Homey devices normally.
 
 ## Flow cards
 
