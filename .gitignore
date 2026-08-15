@@ -1,0 +1,9 @@
+node_modules/
+.homeybuild/
+coverage/
+env.json
+.claude/
+*.tsbuildinfo
+.DS_Store
+.idea/
+.vscode/

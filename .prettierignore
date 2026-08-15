@@ -1,0 +1,7 @@
+node_modules/
+.homeybuild/
+coverage/
+package-lock.json
+app.json
+*.png
+*.svg

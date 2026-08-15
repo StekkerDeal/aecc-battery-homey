@@ -1,0 +1,11 @@
+/.github
+/docs
+/test
+/scripts
+/coverage
+README.md
+tsconfig.json
+vitest.config.mts
+eslint.config.mjs
+.prettierrc.json
+.prettierignore

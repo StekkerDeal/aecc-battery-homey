@@ -1,0 +1,25 @@
+{
+  "id": "nl.stekkerdeal.aecc",
+  "version": "1.0.0",
+  "compatibility": ">=12.13.0",
+  "sdk": 3,
+  "platforms": ["local"],
+  "name": { "en": "AECC Battery", "nl": "AECC Batterij" },
+  "description": {
+    "en": "Get more out of every stored kilowatt-hour",
+    "nl": "Haal meer uit elke opgeslagen kilowattuur"
+  },
+  "category": ["energy"],
+  "brandColor": "#0a1826",
+  "permissions": [],
+  "images": {
+    "small": "/assets/images/small.png",
+    "large": "/assets/images/large.png",
+    "xlarge": "/assets/images/xlarge.png"
+  },
+  "author": { "name": "StekkerDeal", "email": "info@stekkerdeal.nl" },
+  "support": "https://github.com/StekkerDeal/aecc-battery-homey/issues",
+  "source": "https://github.com/StekkerDeal/aecc-battery-homey",
+  "homepage": "https://stekkerdeal.nl",
+  "bugs": { "url": "https://github.com/StekkerDeal/aecc-battery-homey/issues" }
+}

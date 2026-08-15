@@ -1,0 +1,46 @@
+{
+  "name": "nl.stekkerdeal.aecc",
+  "version": "1.0.0",
+  "description": "Local control for AECC platform plug-in home batteries on Homey",
+  "main": "app.js",
+  "license": "MIT",
+  "author": "StekkerDeal <info@stekkerdeal.nl> (https://stekkerdeal.nl)",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/StekkerDeal/aecc-battery-homey.git"
+  },
+  "bugs": {
+    "url": "https://github.com/StekkerDeal/aecc-battery-homey/issues"
+  },
+  "homepage": "https://stekkerdeal.nl",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "coverage": "vitest run --coverage",
+    "compose": "homey app build",
+    "validate": "homey app validate --level publish",
+    "dev": "homey app run --remote"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@tsconfig/node22": "^22.0.6",
+    "@types/homey": "npm:homey-apps-sdk-v3-types@^0.3.12",
+    "@types/node": "^26.2.0",
+    "@vitest/coverage-v8": "^4.1.10",
+    "eslint": "^10.8.1",
+    "eslint-config-prettier": "^10.1.8",
+    "homey": "^4.4.2",
+    "prettier": "^3.9.6",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.67.0",
+    "vitest": "^4.1.10"
+  }
+}

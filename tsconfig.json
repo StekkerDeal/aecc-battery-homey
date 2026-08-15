@@ -1,0 +1,13 @@
+{
+  "extends": "@tsconfig/node22/tsconfig.json",
+  "compilerOptions": {
+    "outDir": ".homeybuild/",
+    "allowJs": true,
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "resolveJsonModule": true,
+    "sourceMap": true
+  },
+  "include": ["app.ts", "lib/**/*.ts", "drivers/**/*.ts"],
+  "exclude": ["node_modules", ".homeybuild", "test", "**/*.test.ts"]
+}
