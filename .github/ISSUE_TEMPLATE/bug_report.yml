@@ -1,0 +1,84 @@
+name: Bug report
+description: Something is broken or behaves unexpectedly
+labels: ['bug']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug!
+
+        **Was your issue closed but the problem persists?** Due to GitHub permissions,
+        only maintainers can reopen issues. Please comment on the closed issue
+        describing what still doesn't work, and we will reopen it for you.
+  - type: input
+    id: homey_version
+    attributes:
+      label: Homey model and firmware version
+      placeholder: 'Homey Pro (Early 2023), firmware 12.13.0'
+    validations:
+      required: true
+  - type: input
+    id: app_version
+    attributes:
+      label: App version
+      description: Settings > Apps > AECC Battery.
+      placeholder: '1.0.0'
+    validations:
+      required: true
+  - type: dropdown
+    id: brand
+    attributes:
+      label: Battery brand
+      description: The brand selected during pairing.
+      options:
+        - Lunergy
+        - Sunpura
+        - Voltdeer
+        - AEG
+        - AFERIY
+        - AccuMate
+        - JET
+        - Oscal
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: model
+    attributes:
+      label: Battery model
+      placeholder: 'Hub 2400 AC, S2400, SR5000, Solarcube AS-BBL09, ...'
+  - type: input
+    id: firmware
+    attributes:
+      label: Device firmware version
+      description: From the vendor app, or the device page in Homey if it is reported there.
+      placeholder: 'BMS V2.05, collector 1.4.9.9.1.1, DSP V6.31'
+  - type: checkboxes
+    id: preconditions
+    attributes:
+      label: Preconditions checked
+      options:
+        - label: No other client is holding the battery's single TCP session (vendor app in local mode, a Home Assistant integration, or another Homey) while reproducing this
+        - label: The battery has a static local IP and answers on TCP port 8080
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug description
+      description: What happened, and what did you expect instead?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. ...
+        2. ...
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: App logs
+      description: Settings > Apps > AECC Battery, open the log view. Remove anything you consider private.
+      render: text
