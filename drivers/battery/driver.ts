@@ -13,6 +13,7 @@ import {
   runConnectionProbe,
   type PairListDevice,
 } from './driver-pairing';
+import type AeccDevice from './device';
 
 export default class AeccDriver extends Homey.Driver {
   public readonly sessions = new SessionRegistry();
@@ -120,6 +121,13 @@ export default class AeccDriver extends Homey.Driver {
         }
 
         await device.setSettings({ host: payload.host, port: payload.port });
+        // setSettings does not fire onSettings, so the running session would
+        // keep polling the old address while the settings page shows the new
+        // one. The device has to swap it explicitly.
+        await (device as AeccDevice).applyConnectionSettings(
+          payload.host,
+          payload.port
+        );
       }
     );
   }

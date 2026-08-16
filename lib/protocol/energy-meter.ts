@@ -62,3 +62,41 @@ export class EnergyIntegrator {
     this.lastSampleAtMs = null;
   }
 }
+
+// Below this delta or this interval since the last flush, a snapshot does
+// not warrant a store write: kWh counters barely move every 2-300s poll.
+export const METER_PERSIST_DELTA_KWH = 0.005;
+export const METER_PERSIST_INTERVAL_MS = 60_000;
+
+export interface ShouldPersistMeterInput {
+  currentChargedKwh: number;
+  currentDischargedKwh: number;
+  lastPersistedChargedKwh: number;
+  lastPersistedDischargedKwh: number;
+  nowMs: number;
+  lastPersistedAtMs: number;
+}
+
+/** True when either counter crossed METER_PERSIST_DELTA_KWH or the interval elapsed. */
+export function shouldPersistMeter(input: ShouldPersistMeterInput): boolean {
+  const {
+    currentChargedKwh,
+    currentDischargedKwh,
+    lastPersistedChargedKwh,
+    lastPersistedDischargedKwh,
+    nowMs,
+    lastPersistedAtMs,
+  } = input;
+
+  const chargedDelta = Math.abs(currentChargedKwh - lastPersistedChargedKwh);
+  const dischargedDelta = Math.abs(
+    currentDischargedKwh - lastPersistedDischargedKwh
+  );
+  const dueByTime = nowMs - lastPersistedAtMs >= METER_PERSIST_INTERVAL_MS;
+
+  return (
+    chargedDelta >= METER_PERSIST_DELTA_KWH ||
+    dischargedDelta >= METER_PERSIST_DELTA_KWH ||
+    dueByTime
+  );
+}

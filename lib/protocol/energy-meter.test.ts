@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { EnergyIntegrator } from './energy-meter';
+import {
+  EnergyIntegrator,
+  METER_PERSIST_DELTA_KWH,
+  METER_PERSIST_INTERVAL_MS,
+  shouldPersistMeter,
+  type ShouldPersistMeterInput,
+} from './energy-meter';
 
 describe('EnergyIntegrator', () => {
   it('does nothing on the first sample (no previous timestamp)', () => {
@@ -116,5 +122,77 @@ describe('EnergyIntegrator', () => {
     expect(meter.chargedKwh).toBe(0);
     expect(meter.dischargedKwh).toBe(0);
     expect(meter.sample(3_600_001, 1000)).toBe(false);
+  });
+});
+
+describe('shouldPersistMeter', () => {
+  const baseline: ShouldPersistMeterInput = {
+    currentChargedKwh: 1,
+    currentDischargedKwh: 1,
+    lastPersistedChargedKwh: 1,
+    lastPersistedDischargedKwh: 1,
+    nowMs: 0,
+    lastPersistedAtMs: 0,
+  };
+
+  it('does not persist below both the kWh delta and the time interval', () => {
+    const input: ShouldPersistMeterInput = {
+      ...baseline,
+      currentChargedKwh: 1 + METER_PERSIST_DELTA_KWH / 2,
+      nowMs: METER_PERSIST_INTERVAL_MS - 1,
+    };
+    expect(shouldPersistMeter(input)).toBe(false);
+  });
+
+  it('persists once the charged kWh delta crosses the threshold', () => {
+    const input: ShouldPersistMeterInput = {
+      ...baseline,
+      currentChargedKwh:
+        baseline.lastPersistedChargedKwh + METER_PERSIST_DELTA_KWH * 2,
+    };
+    expect(shouldPersistMeter(input)).toBe(true);
+  });
+
+  it('persists once the discharged kWh delta crosses the threshold', () => {
+    const input: ShouldPersistMeterInput = {
+      ...baseline,
+      currentDischargedKwh:
+        baseline.lastPersistedDischargedKwh + METER_PERSIST_DELTA_KWH * 2,
+    };
+    expect(shouldPersistMeter(input)).toBe(true);
+  });
+
+  it('persists once the time interval since the last flush elapses', () => {
+    const input: ShouldPersistMeterInput = {
+      ...baseline,
+      nowMs: METER_PERSIST_INTERVAL_MS,
+    };
+    expect(shouldPersistMeter(input)).toBe(true);
+  });
+
+  it('either counter moving alone is enough, independent of the other', () => {
+    const chargedOnly: ShouldPersistMeterInput = {
+      ...baseline,
+      currentChargedKwh:
+        baseline.lastPersistedChargedKwh + METER_PERSIST_DELTA_KWH * 2,
+      currentDischargedKwh: baseline.lastPersistedDischargedKwh,
+    };
+    const dischargedOnly: ShouldPersistMeterInput = {
+      ...baseline,
+      currentChargedKwh: baseline.lastPersistedChargedKwh,
+      currentDischargedKwh:
+        baseline.lastPersistedDischargedKwh + METER_PERSIST_DELTA_KWH * 2,
+    };
+    expect(shouldPersistMeter(chargedOnly)).toBe(true);
+    expect(shouldPersistMeter(dischargedOnly)).toBe(true);
+  });
+
+  it('a delta just below the threshold does not persist on its own', () => {
+    const input: ShouldPersistMeterInput = {
+      ...baseline,
+      currentChargedKwh:
+        baseline.lastPersistedChargedKwh + METER_PERSIST_DELTA_KWH - 0.0001,
+    };
+    expect(shouldPersistMeter(input)).toBe(false);
   });
 });

@@ -9,6 +9,7 @@ import {
 import type { SessionRegistry } from '../../lib/session-registry';
 import {
   EnergyIntegrator,
+  shouldPersistMeter,
   type EnergyIntegratorState,
 } from '../../lib/protocol/energy-meter';
 import type { DerivedTelemetry } from '../../lib/protocol/telemetry';
@@ -16,13 +17,19 @@ import {
   mapSnapshot,
   optionalCapabilities,
 } from '../../lib/homey/capability-map';
-import type { BrandId, DeviceIdentity } from '../../lib/types';
+import type { DeviceIdentity } from '../../lib/types';
 import {
   triggerControlDriftCorrected,
   triggerControlWriteFailed,
   triggerReadingsBecameStale,
   type AeccFlowDevice,
 } from '../../lib/homey/flow';
+import {
+  settingsFrom,
+  type AeccDeviceSettings,
+  type RawSettings,
+} from '../../lib/homey/device-settings';
+import { planEmsCommand } from '../../lib/homey/ems-command';
 
 // The driver package owns driver.ts; this is the shared shape it exposes,
 // see the WP5 contract: one SessionRegistry per driver, keyed by host:port.
@@ -30,34 +37,11 @@ interface AeccDriver extends Homey.Driver {
   readonly sessions: SessionRegistry;
 }
 
-interface AeccDeviceSettings {
-  host: string;
-  port: number;
-  pollIntervalS: number;
-  brand: BrandId;
-  maxChargePowerW: number;
-  maxDischargePowerW: number;
-  verifyIntervalS: number;
-}
-
-type RawSettings = {
-  [key: string]: boolean | string | number | undefined | null;
-};
-
 interface OnSettingsEvent {
   oldSettings: RawSettings;
   newSettings: RawSettings;
   changedKeys: string[];
 }
-
-const DEFAULT_POLL_INTERVAL_S = 5;
-const DEFAULT_VERIFY_INTERVAL_S = 60;
-const DEFAULT_MAX_POWER_W = 800;
-
-// Below this delta or this interval since the last flush, a snapshot does
-// not warrant a store write: kWh counters barely move every 2-300s poll.
-const METER_PERSIST_DELTA_KWH = 0.005;
-const METER_PERSIST_INTERVAL_MS = 60_000;
 
 // Sub-capabilities added/removed at runtime per optionalCapabilities().
 // addCapability/removeCapability are expensive, so the current set is
@@ -75,18 +59,6 @@ function registryKeyFor(host: string, port: number): string {
   return `${host}:${port}`;
 }
 
-function settingsFrom(raw: RawSettings): AeccDeviceSettings {
-  return {
-    host: String(raw.host ?? ''),
-    port: Number(raw.port ?? 0),
-    pollIntervalS: Number(raw.poll_interval ?? DEFAULT_POLL_INTERVAL_S),
-    brand: (raw.brand as BrandId | undefined) ?? 'other',
-    maxChargePowerW: Number(raw.max_charge_power ?? DEFAULT_MAX_POWER_W),
-    maxDischargePowerW: Number(raw.max_discharge_power ?? DEFAULT_MAX_POWER_W),
-    verifyIntervalS: Number(raw.verify_interval ?? DEFAULT_VERIFY_INTERVAL_S),
-  };
-}
-
 export default class AeccDevice extends Homey.Device implements AeccFlowDevice {
   private session!: AeccSession;
   private meter!: EnergyIntegrator;
@@ -94,6 +66,7 @@ export default class AeccDevice extends Homey.Device implements AeccFlowDevice {
   private unsubscribeSession: (() => void) | null = null;
 
   private currentOptionalCapabilities = new Set<string>();
+  private pendingStartHandle: NodeJS.Timeout | null = null;
 
   private lastPersistedChargedKwh = 0;
   private lastPersistedDischargedKwh = 0;
@@ -169,16 +142,62 @@ export default class AeccDevice extends Homey.Device implements AeccFlowDevice {
       void this.handleSessionEvent(event);
     });
 
-    // Only the device instance that actually created the session (not one
-    // joining an already-running session for the same host:port) starts
-    // it, staggered by its registry index so a batch of devices coming up
-    // together (e.g. after an app update) do not all dial at once.
-    if (created) {
-      const startDelayMs = index * 1000 + Math.floor(Math.random() * 250);
-      this.homey.setTimeout(() => {
-        void session.start();
-      }, startDelayMs);
-    }
+    this.scheduleStart(created, session, index);
+  }
+
+  // Only the device instance that actually created the session (not one
+  // joining an already-running session for the same host:port) starts it,
+  // staggered by its registry index so a batch of devices coming up together
+  // (e.g. after an app update) do not all dial at once.
+  private scheduleStart(
+    created: boolean,
+    session: AeccSession,
+    index: number
+  ): void {
+    if (!created) return;
+    const startDelayMs = index * 1000 + Math.floor(Math.random() * 250);
+    this.pendingStartHandle = this.homey.setTimeout(() => {
+      this.pendingStartHandle = null;
+      void session.start();
+    }, startDelayMs);
+  }
+
+  // The pending start must be cancellable: teardown stops the session through
+  // the registry, but a timer that still fires calls start() again and leaves
+  // an untracked poll loop holding the battery's single TCP session slot.
+  private clearPendingStart(): void {
+    if (this.pendingStartHandle === null) return;
+    this.homey.clearTimeout(this.pendingStartHandle);
+    this.pendingStartHandle = null;
+  }
+
+  private async rebindSession(settings: AeccDeviceSettings): Promise<void> {
+    const driver = this.driver as AeccDriver;
+    this.clearPendingStart();
+    this.unsubscribeSession?.();
+    this.unsubscribeSession = null;
+    await driver.sessions.release(this.registryKey);
+
+    const newKey = registryKeyFor(settings.host, settings.port);
+    let created = false;
+    const { session, index } = driver.sessions.acquire(newKey, () => {
+      created = true;
+      return this.createSession(settings);
+    });
+    this.session = session;
+    this.registryKey = newKey;
+    this.unsubscribeSession = session.subscribe(event => {
+      void this.handleSessionEvent(event);
+    });
+    this.scheduleStart(created, session, index);
+  }
+
+  // onRepair writes the new address with setSettings, which the SDK
+  // explicitly does not route through onSettings, so the repair path has to
+  // swap the session itself or it keeps polling the old address.
+  async applyConnectionSettings(host: string, port: number): Promise<void> {
+    const settings = settingsFrom(this.getSettings() as RawSettings);
+    await this.rebindSession({ ...settings, host, port });
   }
 
   async onSettings({
@@ -188,30 +207,7 @@ export default class AeccDevice extends Homey.Device implements AeccFlowDevice {
     const settings = settingsFrom(newSettings);
 
     if (changedKeys.includes('host') || changedKeys.includes('port')) {
-      const driver = this.driver as AeccDriver;
-      const oldKey = this.registryKey;
-      const newKey = registryKeyFor(settings.host, settings.port);
-
-      this.unsubscribeSession?.();
-      await driver.sessions.release(oldKey);
-
-      let created = false;
-      const { session, index } = driver.sessions.acquire(newKey, () => {
-        created = true;
-        return this.createSession(settings);
-      });
-      this.session = session;
-      this.registryKey = newKey;
-      this.unsubscribeSession = session.subscribe(event => {
-        void this.handleSessionEvent(event);
-      });
-
-      if (created) {
-        const startDelayMs = index * 1000 + Math.floor(Math.random() * 250);
-        this.homey.setTimeout(() => {
-          void session.start();
-        }, startDelayMs);
-      }
+      await this.rebindSession(settings);
     } else {
       const patch: AeccSessionUpdatableOptions = {};
       if (changedKeys.includes('poll_interval')) {
@@ -350,6 +346,7 @@ export default class AeccDevice extends Homey.Device implements AeccFlowDevice {
   }
 
   private async teardown(): Promise<void> {
+    this.clearPendingStart();
     this.unsubscribeSession?.();
     this.unsubscribeSession = null;
     await this.persistMeter();
@@ -362,12 +359,15 @@ export default class AeccDevice extends Homey.Device implements AeccFlowDevice {
   private async handleEmsCapabilities(
     capabilityValues: Record<string, unknown>
   ): Promise<void> {
-    const modeRaw =
-      capabilityValues.target_power_mode ??
-      this.getCapabilityValue('target_power_mode');
-    const mode = String(modeRaw);
+    const command = planEmsCommand({
+      changed: capabilityValues,
+      currentMode: this.getCapabilityValue('target_power_mode'),
+      currentTargetPower: this.getCapabilityValue('target_power'),
+    });
 
-    if (mode === 'device') {
+    if (command.kind === 'none') return;
+
+    if (command.kind === 'self_consumption') {
       // Clears register 3003: without this the firmware keeps running the
       // previous manual setpoint instead of handing control back to the AI.
       const ok = await this.session.setWorkMode('self_consumption');
@@ -378,22 +378,16 @@ export default class AeccDevice extends Homey.Device implements AeccFlowDevice {
       return;
     }
 
-    // mode 'homey': setTargetPower's payload already includes the full
-    // custom-mode register set plus the setpoint in one write, so this one
-    // call both takes control and applies target_power. Without it the
-    // device stays idle until the next command.
-    // A freshly paired device has no setpoint yet. Default to 0 explicitly
-    // rather than relying on Number(null), and write it back so the tile
-    // shows 0W instead of leaving the user wondering why nothing happened.
-    const targetPowerRaw =
-      capabilityValues.target_power ?? this.getCapabilityValue('target_power');
-    const parsed = Number(targetPowerRaw);
-    const targetPower = Number.isFinite(parsed) ? parsed : 0;
-    if (this.getCapabilityValue('target_power') !== targetPower) {
-      await this.setCapabilityValue('target_power', targetPower);
+    // setTargetPower's payload already includes the full custom-mode register
+    // set plus the setpoint in one write, so this call both takes control and
+    // applies it. Without it the device stays idle until the next command.
+    // The resolved value is written back so the tile shows 0W rather than
+    // leaving the user wondering why nothing happened.
+    if (this.getCapabilityValue('target_power') !== command.watts) {
+      await this.setCapabilityValue('target_power', command.watts);
     }
 
-    const ok = await this.session.setTargetPower(targetPower);
+    const ok = await this.session.setTargetPower(command.watts);
     await this.assertWriteOk(ok, {
       en: 'Could not apply the target power to the battery.',
       nl: 'Het doelvermogen kon niet naar de batterij worden geschreven.',
@@ -462,7 +456,34 @@ export default class AeccDevice extends Homey.Device implements AeccFlowDevice {
       await this.setCapabilityValue(update.id, update.value);
     }
 
+    if (snapshot.identity) {
+      await this.syncIdentitySettings(snapshot.identity);
+    }
+
     await this.maybePersistMeter(snapshot.lastPollAtMs ?? Date.now());
+  }
+
+  // The settings page carries read-only serial, firmware and model labels
+  // that pairing cannot fill: discovery never probes identity and the serial
+  // only reaches the store. Programmatic setSettings does not re-enter
+  // onSettings, so writing them back here cannot loop.
+  private async syncIdentitySettings(identity: DeviceIdentity): Promise<void> {
+    const current = this.getSettings() as RawSettings;
+    const patch: RawSettings = {};
+    if (identity.serial !== undefined && current.serial !== identity.serial) {
+      patch.serial = identity.serial;
+    }
+    if (
+      identity.firmware !== undefined &&
+      current.firmware !== identity.firmware
+    ) {
+      patch.firmware = identity.firmware;
+    }
+    if (identity.model !== undefined && current.model !== identity.model) {
+      patch.model = identity.model;
+    }
+    if (Object.keys(patch).length === 0) return;
+    await this.setSettings(patch);
   }
 
   private async handleUnavailableEvent(): Promise<void> {
@@ -532,20 +553,15 @@ export default class AeccDevice extends Homey.Device implements AeccFlowDevice {
   // --- energy meter persistence ----------------------------------------------
 
   private async maybePersistMeter(nowMs: number): Promise<void> {
-    const chargedDelta = Math.abs(
-      this.meter.chargedKwh - this.lastPersistedChargedKwh
-    );
-    const dischargedDelta = Math.abs(
-      this.meter.dischargedKwh - this.lastPersistedDischargedKwh
-    );
-    const dueByTime =
-      nowMs - this.lastPersistedAtMs >= METER_PERSIST_INTERVAL_MS;
-
-    if (
-      chargedDelta >= METER_PERSIST_DELTA_KWH ||
-      dischargedDelta >= METER_PERSIST_DELTA_KWH ||
-      dueByTime
-    ) {
+    const due = shouldPersistMeter({
+      currentChargedKwh: this.meter.chargedKwh,
+      currentDischargedKwh: this.meter.dischargedKwh,
+      lastPersistedChargedKwh: this.lastPersistedChargedKwh,
+      lastPersistedDischargedKwh: this.lastPersistedDischargedKwh,
+      nowMs,
+      lastPersistedAtMs: this.lastPersistedAtMs,
+    });
+    if (due) {
       await this.persistMeter();
     }
   }
