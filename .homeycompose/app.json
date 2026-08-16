@@ -9,11 +9,47 @@
     "nl": "AECC Plug-in Thuisbatterij"
   },
   "description": {
-    "en": "Get more out of every stored kilowatt-hour",
-    "nl": "Haal meer uit elke opgeslagen kilowattuur"
+    "en": "Full local control, no cloud connection",
+    "nl": "Volledige lokale besturing, zonder cloud"
   },
   "category": ["energy"],
-  "brandColor": "#0a1826",
+  "brandColor": "#00b0e7",
+  "tags": {
+    "en": [
+      "battery",
+      "home battery",
+      "plug-in battery",
+      "energy storage",
+      "local",
+      "AECC",
+      "Sunpura",
+      "Lunergy",
+      "Voltdeer",
+      "AEG",
+      "Solarcube",
+      "AFERIY",
+      "AccuMate",
+      "JET",
+      "Oscal"
+    ],
+    "nl": [
+      "batterij",
+      "thuisbatterij",
+      "stekkerbatterij",
+      "energieopslag",
+      "lokaal",
+      "AECC",
+      "Sunpura",
+      "Lunergy",
+      "Voltdeer",
+      "AEG",
+      "Solarcube",
+      "AFERIY",
+      "AccuMate",
+      "JET",
+      "Oscal"
+    ]
+  },
   "permissions": [],
   "images": {
     "small": "/assets/images/small.png",
