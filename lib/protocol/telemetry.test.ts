@@ -224,14 +224,14 @@ describe('derive', () => {
     const frame: EnergyFrame = {
       Storage_list: [
         {
-          BatteryChargingPower: 100,
-          AcChargingPower: 50,
+          BatteryChargingPower: 1000,
+          AcChargingPower: 5000,
           BatteryDischargingPower: 0,
         },
       ],
     };
     const result = derive(frame, 55);
-    expect(result.measurePowerW).toBe(10);
+    expect(result.measurePowerW).toBe(500);
     expect(result.chargingState).toBe('charging');
     expect(result.socPct).toBe(55);
   });
@@ -242,12 +242,12 @@ describe('derive', () => {
         {
           BatteryChargingPower: 0,
           AcChargingPower: 0,
-          BatteryDischargingPower: 80,
+          BatteryDischargingPower: 8000,
         },
       ],
     };
     const result = derive(frame, 40);
-    expect(result.measurePowerW).toBe(-8);
+    expect(result.measurePowerW).toBe(-800);
     expect(result.chargingState).toBe('discharging');
   });
 
@@ -256,6 +256,71 @@ describe('derive', () => {
     const result = derive(frame, 50);
     expect(result.measurePowerW).toBe(0);
     expect(result.chargingState).toBe('idle');
+  });
+
+  // A stopped battery idles at a few watts of standby draw, measured at 10W
+  // charging and -5W discharging on the JET, so an exact-zero test would have
+  // left the tile permanently reading charging or discharging.
+  it('calls standby draw inside the deadband idle without hiding it from measure_power', () => {
+    const frame: EnergyFrame = {
+      Storage_list: [
+        {
+          BatteryChargingPower: 100,
+          AcChargingPower: 0,
+          BatteryDischargingPower: 0,
+        },
+      ],
+    };
+    const result = derive(frame, 50);
+    expect(result.measurePowerW).toBe(10);
+    expect(result.chargingState).toBe('idle');
+  });
+
+  it('calls standby discharge inside the deadband idle', () => {
+    const frame: EnergyFrame = {
+      Storage_list: [
+        {
+          BatteryChargingPower: 0,
+          AcChargingPower: 0,
+          BatteryDischargingPower: 50,
+        },
+      ],
+    };
+    const result = derive(frame, 50);
+    expect(result.measurePowerW).toBe(-5);
+    expect(result.chargingState).toBe('idle');
+  });
+
+  it('reports charging and discharging just outside the deadband', () => {
+    const charging = derive(
+      {
+        Storage_list: [
+          {
+            BatteryChargingPower: 260,
+            AcChargingPower: 0,
+            BatteryDischargingPower: 0,
+          },
+        ],
+      },
+      50
+    );
+    expect(charging.measurePowerW).toBe(26);
+    expect(charging.chargingState).toBe('charging');
+
+    const discharging = derive(
+      {
+        Storage_list: [
+          {
+            BatteryChargingPower: 0,
+            AcChargingPower: 0,
+            BatteryDischargingPower: 260,
+          },
+        ],
+      },
+      50
+    );
+    expect(discharging.measurePowerW).toBe(-26);
+    expect(discharging.chargingState).toBe('discharging');
   });
 
   it('reports a null chargingState when there is no power signal at all', () => {

@@ -216,6 +216,11 @@ export function wallPowerSignalW(frame: EnergyFrame): number | null {
   return null;
 }
 
+// A stopped battery still draws standby power (10W measured on a JET), so an
+// exact-zero test would never report idle. Only the tri-state label uses the
+// deadband; measure_power itself stays truthful so the meters keep integrating.
+export const IDLE_DEADBAND_W = 25;
+
 // Absent readings stay null rather than collapsing to 0. The device surface
 // varies per brand, so null means "this model does not report it" and drives
 // which optional capabilities the device adds.
@@ -251,9 +256,9 @@ export function derive(
   const chargingState =
     measurePowerW === null
       ? null
-      : measurePowerW > 0
+      : measurePowerW > IDLE_DEADBAND_W
         ? 'charging'
-        : measurePowerW < 0
+        : measurePowerW < -IDLE_DEADBAND_W
           ? 'discharging'
           : 'idle';
 

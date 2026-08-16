@@ -487,6 +487,11 @@ export default class AeccDevice extends Homey.Device implements AeccFlowDevice {
     event: Extract<SessionEvent, { type: 'write' }>
   ): Promise<void> {
     if (!event.ok) {
+      // Logged as well as triggered: a flow card only helps users who already
+      // built a flow, and a bug report needs the failure in the app log.
+      this.error(
+        `control write failed: ${event.operation} after ${event.attempts} attempts`
+      );
       await triggerControlWriteFailed(this.homey, this, {
         operation: event.operation,
         attempts: event.attempts,
@@ -497,6 +502,9 @@ export default class AeccDevice extends Homey.Device implements AeccFlowDevice {
   private async handleDriftEvent(
     event: Extract<SessionEvent, { type: 'drift' }>
   ): Promise<void> {
+    this.log(
+      `drift corrected: expected ${event.expectedPowerW}W, found ${event.foundPowerW}W`
+    );
     await triggerControlDriftCorrected(this.homey, this, {
       expected: event.expectedPowerW,
       found: event.foundPowerW,
