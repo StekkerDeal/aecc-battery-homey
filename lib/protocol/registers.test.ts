@@ -5,7 +5,6 @@ import {
   DM_MODEL,
   DM_RSSI,
   DM_SERIAL,
-  MAX_BATTERY_POWER_W,
   MAX_REGISTER_POWER_DEFAULT,
   REG_AI_SMART_CHARGE,
   REG_AI_SMART_DISC,
@@ -34,7 +33,6 @@ describe('registers', () => {
 
   it('exposes the idle slot string and power limits', () => {
     expect(SLOT_DISABLED).toBe('0,00:00,00:00,0,0,0,0,0,0,100,10');
-    expect(MAX_BATTERY_POWER_W).toBe(2400);
     expect(MAX_REGISTER_POWER_DEFAULT).toBe(800);
   });
 

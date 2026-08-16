@@ -6,7 +6,6 @@ import {
   parseEnergyFrame,
   systemValue,
   unitKey,
-  unitValue,
   wallPowerSignalW,
 } from './telemetry';
 
@@ -155,25 +154,6 @@ describe('systemValue: field map scale conventions', () => {
       Storage_list: [{ Pv1Power: 10 }, { Pv1Power: Number.NaN }],
     };
     expect(systemValue(frame, 'pv1_power')).toBe(10);
-  });
-});
-
-describe('unitValue', () => {
-  it('reads a scaled value for a specific unit by key', () => {
-    const frame: EnergyFrame = { Storage_list: [jetUnit] };
-    expect(unitValue(frame, 'JET-SN-0001', 'ac_charging_power')).toBe(798);
-  });
-
-  it('returns undefined for an unknown unit key', () => {
-    const frame: EnergyFrame = { Storage_list: [jetUnit] };
-    expect(
-      unitValue(frame, 'nonexistent', 'ac_charging_power')
-    ).toBeUndefined();
-  });
-
-  it('returns undefined when the field is missing on the matched unit', () => {
-    const frame: EnergyFrame = { Storage_list: [{ StorageSN: 'X' }] };
-    expect(unitValue(frame, 'X', 'ac_charging_power')).toBeUndefined();
   });
 });
 

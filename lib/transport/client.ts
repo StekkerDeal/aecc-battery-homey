@@ -44,7 +44,15 @@ export interface AeccClientOptions {
 }
 
 class ReadTimeoutError extends Error {}
-class ProtocolError extends Error {}
+class ProtocolError extends Error {
+  constructor(
+    message: string,
+    readonly preview: string = '',
+    readonly byteLength: number = 0
+  ) {
+    super(message);
+  }
+}
 
 // Serialises async work one-at-a-time in call order, the Python _io_lock
 // equivalent. Exported so lib/session.ts can reuse it for the write lock.
@@ -217,7 +225,16 @@ export class AeccClient {
         return null;
       }
       if (err instanceof ProtocolError) {
-        this.logger.error(`${op} ${command} protocol error: ${err.message}`);
+        // A DeviceManagement body never reaches the log. The safe register
+        // list already keeps WiFi credentials out of the response, but the
+        // body stays out regardless so widening that list cannot leak them.
+        const detail =
+          command === 'DeviceManagement'
+            ? `${err.byteLength} bytes`
+            : `${err.byteLength} bytes: ${err.preview}`;
+        this.logger.error(
+          `${op} ${command} protocol error: ${err.message} (${detail})`
+        );
         return null;
       }
       await this.handleConnectionError(op, command, err);
@@ -264,7 +281,13 @@ export class AeccClient {
         if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
           finishResolve(parsed as Record<string, unknown>);
         } else {
-          finishReject(new ProtocolError('response was not a JSON object'));
+          finishReject(
+            new ProtocolError(
+              'response was not a JSON object',
+              acc.preview,
+              acc.byteLength
+            )
+          );
         }
       };
       const onError = (err: unknown): void => {

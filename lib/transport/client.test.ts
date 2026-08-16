@@ -209,6 +209,56 @@ describe('AeccClient basic requests', () => {
     expect(await pending).toBeNull();
     expect(client.consecutiveFailures).toBe(0);
   });
+
+  it('logs the malformed body so a protocol error is diagnosable', async () => {
+    const socket = new FakeSocket();
+    const errors: string[] = [];
+    const client = new AeccClient({
+      host: 'h',
+      port: 1,
+      socketFactory: autoConnectFactory([socket]),
+      logger: {
+        log: () => {},
+        error: (...args) => errors.push(args.join(' ')),
+      },
+    });
+
+    const pending = client.getEnergyParameters();
+    await flush();
+    socket.reply([1, 2, 3]);
+    await pending;
+
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toContain('EnergyParameter protocol error');
+    expect(errors[0]).toContain('[1,2,3]');
+  });
+
+  // The safe register list already keeps WiFi credentials out of a
+  // DeviceManagement response, but the body must stay out of the log
+  // regardless so widening that list can never leak them.
+  it('never logs a DeviceManagement body', async () => {
+    const socket = new FakeSocket();
+    const errors: string[] = [];
+    const client = new AeccClient({
+      host: 'h',
+      port: 1,
+      socketFactory: autoConnectFactory([socket]),
+      logger: {
+        log: () => {},
+        error: (...args) => errors.push(args.join(' ')),
+      },
+    });
+
+    const pending = client.getDeviceIdentity();
+    await flush();
+    socket.reply(['SomeHomeWifi', 'hunter2']);
+    await pending;
+
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toContain('DeviceManagement protocol error');
+    expect(errors[0]).not.toContain('SomeHomeWifi');
+    expect(errors[0]).not.toContain('hunter2');
+  });
 });
 
 describe('AeccClient.getDeviceIdentity', () => {

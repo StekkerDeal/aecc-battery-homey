@@ -6,10 +6,10 @@
 // driver.test.ts exercise the actual pairing logic instead of skipping it.
 import type Homey from 'homey';
 import { parseEnergyFrame } from '../../lib/protocol/telemetry';
+import { MAX_REGISTER_POWER_DEFAULT } from '../../lib/protocol/registers';
 import type { BrandId, DeviceIdentity } from '../../lib/types';
 
 const DEFAULT_PORT = 8080;
-const DEFAULT_MAX_POWER_W = 800;
 
 const BRAND_IDS: readonly BrandId[] = [
   'lunergy',
@@ -143,11 +143,11 @@ export function parseSetBrandPayload(data: unknown): SetBrandPayload {
   const model = typeof record.model === 'string' ? record.model.trim() : '';
   const maxChargePowerW = toPositiveInt(
     record.max_charge_power,
-    DEFAULT_MAX_POWER_W
+    MAX_REGISTER_POWER_DEFAULT
   );
   const maxDischargePowerW = toPositiveInt(
     record.max_discharge_power,
-    DEFAULT_MAX_POWER_W
+    MAX_REGISTER_POWER_DEFAULT
   );
   return { brand, model, maxChargePowerW, maxDischargePowerW };
 }

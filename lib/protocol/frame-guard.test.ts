@@ -136,4 +136,11 @@ describe('FrameGuard', () => {
     expect(stats.lastReason).toMatch(/SOC collapsed/);
     expect(stats.lastAt).not.toBeNull();
   });
+
+  it('stamps the stats timestamp from the injected clock', () => {
+    const guard = new FrameGuard({ now: () => 1_760_000_000_000 });
+    guard.accept(frameWith(10));
+    guard.accept(frameWith(0));
+    expect(guard.stats.lastAt).toBe(new Date(1_760_000_000_000).toISOString());
+  });
 });

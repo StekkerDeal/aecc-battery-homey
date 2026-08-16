@@ -4,6 +4,8 @@ import { frameUnits, unitKey } from './telemetry';
 export interface FrameGuardOptions {
   tolerance?: number;
   socCollapseFloor?: number;
+  /** Epoch millis source for the stats timestamp, injectable for tests. */
+  now?: () => number;
 }
 
 export interface FrameGuardResult {
@@ -34,6 +36,9 @@ function unitLabel(unit: StorageUnit): string {
 export class FrameGuard {
   private readonly tolerance: number;
   private readonly socCollapseFloor: number;
+  // Everything else in the session routes time through a scheduler; this
+  // matches so the stats timestamp is not the one value fake timers miss.
+  private readonly now: () => number;
   private lastGood: EnergyFrame | null = null;
   private suspectStreak = 0;
   private suspectFramesTotal = 0;
@@ -44,6 +49,7 @@ export class FrameGuard {
     this.tolerance = options.tolerance ?? DEFAULT_TOLERANCE;
     this.socCollapseFloor =
       options.socCollapseFloor ?? DEFAULT_SOC_COLLAPSE_FLOOR;
+    this.now = options.now ?? Date.now;
   }
 
   accept(frame: EnergyFrame): FrameGuardResult {
@@ -58,7 +64,7 @@ export class FrameGuard {
       this.suspectStreak += 1;
       this.suspectFramesTotal += 1;
       this.lastReason = reason;
-      this.lastAt = new Date().toISOString();
+      this.lastAt = new Date(this.now()).toISOString();
       // Safe: suspectReason only returns non-null when lastGood is set.
       return {
         frame: this.lastGood as EnergyFrame,

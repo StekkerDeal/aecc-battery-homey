@@ -13,7 +13,6 @@ export const REG_MAX_FEED_POWER = '3039';
 // auto-re-enable EMS after a disable.
 export const SLOT_DISABLED = '0,00:00,00:00,0,0,0,0,0,0,100,10';
 
-export const MAX_BATTERY_POWER_W = 2400;
 export const MAX_REGISTER_POWER_DEFAULT = 800;
 
 // DeviceManagement register whitelist: identity and RSSI only. Registers 56

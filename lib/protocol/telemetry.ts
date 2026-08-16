@@ -174,20 +174,6 @@ export function systemValue(
   );
 }
 
-export function unitValue(
-  frame: EnergyFrame,
-  targetUnitKey: string,
-  key: TelemetryKey
-): number | undefined {
-  const spec = FIELD_MAP[key];
-  for (const unit of frameUnits(frame)) {
-    if (unitKey(unit) !== targetUnitKey) continue;
-    const num = toFiniteNumber(unit[spec.storageField]);
-    return num === undefined ? undefined : round1(num * spec.storageScale);
-  }
-  return undefined;
-}
-
 // Best-effort wall-side power magnitude used by the SOC cleaner. Signed:
 // positive when charging, negative when discharging, null when neither
 // source has data.
