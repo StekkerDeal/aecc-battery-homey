@@ -46,19 +46,19 @@ For development or pre-release builds, see [`docs/development.md`](docs/developm
 
 ## Capabilities
 
-| Capability                       | Unit | Notes                                                                                                                                      |
-| -------------------------------- | ---- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `measure_power`                  | W    | Signed: positive = charging, negative = discharging                                                                                        |
-| `measure_battery`                | %    | State of charge                                                                                                                            |
-| `battery_charging_state`         | -    | Homey's standard charging-state enum (`charging` / `discharging` / `idle`), derived from `measure_power`                                   |
-| `meter_power.charged`            | kWh  | Locally integrated charged energy total. See Energy totals below                                                                           |
-| `meter_power.discharged`         | kWh  | Locally integrated discharged energy total. See Energy totals below                                                                        |
-| `target_power`                   | W    | Signed setpoint, -2400 to 2400: positive = charge, negative = discharge, 0 = idle. Requires Homey firmware 12.13.0 or newer                |
-| `target_power_mode`              | -    | `device` (Self-consumption / AI) hands control back to the battery's own logic; `homey` (Homey control) makes `target_power` authoritative |
-| `aecc_min_soc` (Discharge limit) | %    | Battery stops discharging at this SOC, 5-50%                                                                                               |
-| `aecc_max_soc` (Charge limit)    | %    | Battery stops charging at this SOC, 50-100%                                                                                                |
-| `aecc_last_update`               | -    | Timestamp string of the last successful poll                                                                                               |
-| `button.reset_meters`            | -    | Maintenance action. Resets both energy meters to zero; breaks this device's Homey Energy history continuity                                |
+| Capability                       | Unit | Notes                                                                                                                                                                                     |
+| -------------------------------- | ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `measure_power`                  | W    | Signed: positive = charging, negative = discharging                                                                                                                                       |
+| `measure_battery`                | %    | State of charge                                                                                                                                                                           |
+| `battery_charging_state`         | -    | Homey's standard charging-state enum (`charging` / `discharging` / `idle`), derived from `measure_power` with a 25W deadband, so the standby draw of a stopped battery still reads `idle` |
+| `meter_power.charged`            | kWh  | Locally integrated charged energy total. See Energy totals below                                                                                                                          |
+| `meter_power.discharged`         | kWh  | Locally integrated discharged energy total. See Energy totals below                                                                                                                       |
+| `target_power`                   | W    | Signed setpoint, -2400 to 2400: positive = charge, negative = discharge, 0 = idle. Requires Homey firmware 12.13.0 or newer                                                               |
+| `target_power_mode`              | -    | `device` (Self-consumption / AI) hands control back to the battery's own logic; `homey` (Homey control) makes `target_power` authoritative                                                |
+| `aecc_min_soc` (Discharge limit) | %    | Battery stops discharging at this SOC, 5-50%                                                                                                                                              |
+| `aecc_max_soc` (Charge limit)    | %    | Battery stops charging at this SOC, 50-100%                                                                                                                                               |
+| `aecc_last_update`               | -    | Timestamp string of the last successful poll                                                                                                                                              |
+| `button.reset_meters`            | -    | Maintenance action. Resets both energy meters to zero; breaks this device's Homey Energy history continuity                                                                               |
 
 ### Energy totals
 
@@ -76,7 +76,33 @@ Both directions are bounded by the **Max charge power** / **Max discharge power*
 
 ## Flow cards
 
-This app does not yet define custom flow cards beyond what Homey generates automatically from the capabilities table above: a trigger for every capability change (including "Battery power changed" and "State of charge changed"), a condition and action pair for every setable capability (`target_power`, `target_power_mode`, `aecc_min_soc`, `aecc_max_soc`), and `button.reset_meters` as a maintenance action rather than a flow card. Purpose-built flow cards may be added in a later version; if you need one that does not exist yet, open an issue describing the automation you are trying to build.
+This app defines 9 custom flow cards: 3 triggers, 1 condition and 5 actions. They come in addition to what Homey generates automatically from the capabilities table above: the standard capabilities `target_power`, `target_power_mode`, `measure_battery`, `measure_power` and `battery_charging_state` still generate their own flow cards automatically (a trigger for every one of them changing, plus a condition and action pair for the setable ones among them), so you get those for free on top of the 9 listed here. `button.reset_meters` remains a maintenance action rather than a flow card.
+
+### Triggers
+
+| Card                     | ID                        | Tokens                                             | Fires when                                                                                             |
+| ------------------------ | ------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| Control command failed   | `control_write_failed`    | `operation` (text), `attempts` (number)            | All retries are exhausted without an acknowledgement from the battery                                  |
+| Setpoint drift corrected | `control_drift_corrected` | `expected` (Expected power), `found` (Found power) | The battery's actual setpoint no longer matches what this app last wrote, and this app has restored it |
+| Readings became stale    | `readings_became_stale`   | `seconds` (Seconds since last reading)             | Polling stops producing fresh data. Fires once, not repeatedly while the battery stays unreachable     |
+
+### Conditions
+
+| Card                                                | ID                   | Arguments                          | Checks                                                                                                                              |
+| --------------------------------------------------- | -------------------- | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| Data is / is not fresher than `seconds` seconds old | `readings_are_fresh` | `seconds` (number, 5-3600, step 5) | Whether a successful reading arrived within the given number of seconds. Use this to guard other actions from running on stale data |
+
+### Actions
+
+| Card                            | ID                    | Arguments                                              | What it does                                                                                                                                         |
+| ------------------------------- | --------------------- | ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Charge at a set power           | `set_charge_power`    | `power` (0-2400W, step 10)                             | Sets the mode to Homey control and charges at this power. Also callable from HomeyScript                                                             |
+| Discharge at a set power        | `set_discharge_power` | `power` (0-2400W, step 10)                             | Sets the mode to Homey control and discharges at this power. Also callable from HomeyScript                                                          |
+| Stop                            | `stop_battery`        | none                                                   | Holds an active 0W setpoint with energy management still enabled, unlike switching to self-consumption mode, which hands control back to the battery |
+| Set charge and discharge limits | `set_soc_limits`      | `min_soc` (5-50%, step 5), `max_soc` (50-100%, step 5) | Sets the discharge limit to `min_soc` and the charge limit to `max_soc` in a single card                                                             |
+| Reapply the setpoint            | `reapply_setpoint`    | none                                                   | Rewrites the current target power to the battery without changing its value. Useful as a recovery step after a failed control command                |
+
+Purpose-built flow cards beyond these may be added in a later version; if you need one that does not exist yet, open an issue describing the automation you are trying to build.
 
 ## Troubleshooting
 

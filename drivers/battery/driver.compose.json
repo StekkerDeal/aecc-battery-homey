@@ -26,6 +26,21 @@
     "measure_power": {
       "title": { "en": "Battery power", "nl": "Batterijvermogen" }
     },
+    "measure_power.grid": {
+      "title": { "en": "Grid power", "nl": "Netvermogen" }
+    },
+    "measure_power.pv": {
+      "title": { "en": "PV power", "nl": "PV-vermogen" }
+    },
+    "measure_power.pv1": {
+      "title": { "en": "PV string 1", "nl": "PV-string 1" }
+    },
+    "measure_power.pv2": {
+      "title": { "en": "PV string 2", "nl": "PV-string 2" }
+    },
+    "measure_power.backup": {
+      "title": { "en": "Backup power", "nl": "Noodstroomvermogen" }
+    },
     "meter_power.charged": {
       "title": { "en": "Charged energy", "nl": "Geladen energie" }
     },
