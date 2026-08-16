@@ -126,6 +126,12 @@ export default class AeccDevice extends Homey.Device implements AeccFlowDevice {
       decimals: 0,
     });
 
+    // Never leave the setpoint null: a null reads as 0 anyway once a mode
+    // switch coerces it, so make that visible in the UI from the start.
+    if (this.getCapabilityValue('target_power') === null) {
+      await this.setCapabilityValue('target_power', 0);
+    }
+
     this.currentOptionalCapabilities = new Set(
       this.getCapabilities().filter(id => OPTIONAL_CAPABILITY_IDS.includes(id))
     );
@@ -376,9 +382,17 @@ export default class AeccDevice extends Homey.Device implements AeccFlowDevice {
     // custom-mode register set plus the setpoint in one write, so this one
     // call both takes control and applies target_power. Without it the
     // device stays idle until the next command.
+    // A freshly paired device has no setpoint yet. Default to 0 explicitly
+    // rather than relying on Number(null), and write it back so the tile
+    // shows 0W instead of leaving the user wondering why nothing happened.
     const targetPowerRaw =
       capabilityValues.target_power ?? this.getCapabilityValue('target_power');
-    const targetPower = Number(targetPowerRaw);
+    const parsed = Number(targetPowerRaw);
+    const targetPower = Number.isFinite(parsed) ? parsed : 0;
+    if (this.getCapabilityValue('target_power') !== targetPower) {
+      await this.setCapabilityValue('target_power', targetPower);
+    }
+
     const ok = await this.session.setTargetPower(targetPower);
     await this.assertWriteOk(ok, {
       en: 'Could not apply the target power to the battery.',
