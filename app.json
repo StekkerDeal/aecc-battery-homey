@@ -438,16 +438,10 @@
           }
         },
         {
-          "id": "manual_entry",
-          "navigation": {
-            "next": "choose_brand"
-          }
+          "id": "manual_entry"
         },
         {
-          "id": "choose_brand",
-          "navigation": {
-            "next": "add_devices"
-          }
+          "id": "choose_brand"
         },
         {
           "id": "add_devices",

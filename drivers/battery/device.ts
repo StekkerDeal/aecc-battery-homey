@@ -417,9 +417,15 @@ export default class AeccDevice extends Homey.Device implements AeccFlowDevice {
   }
 
   private async handleSnapshotEvent(snapshot: SessionSnapshot): Promise<void> {
-    const updates = mapSnapshot(snapshot, this.meter);
-    for (const update of updates) {
-      await this.setCapabilityValue(update.id, update.value);
+    // Optional capabilities must exist before anything writes to them. A
+    // write to a missing capability throws and aborts the rest of this
+    // handler, so the capability would never be added and every later poll
+    // would fail the same way.
+    if (snapshot.telemetry) {
+      await this.syncOptionalCapabilities(
+        snapshot.telemetry,
+        snapshot.identity ?? {}
+      );
     }
 
     this.lastGoodPollAtMs = snapshot.lastGoodPollAtMs;
@@ -435,11 +441,11 @@ export default class AeccDevice extends Homey.Device implements AeccFlowDevice {
       this.meter.sample(nowMs, snapshot.telemetry.measurePowerW);
     }
 
-    if (snapshot.telemetry) {
-      await this.syncOptionalCapabilities(
-        snapshot.telemetry,
-        snapshot.identity ?? {}
-      );
+    for (const update of mapSnapshot(snapshot, this.meter)) {
+      // Skip unknown ids rather than throwing: one unexpected capability
+      // must not take down the whole snapshot path.
+      if (!this.hasCapability(update.id)) continue;
+      await this.setCapabilityValue(update.id, update.value);
     }
 
     await this.maybePersistMeter(snapshot.lastPollAtMs ?? Date.now());

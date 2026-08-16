@@ -74,14 +74,8 @@
       "template": "list_devices",
       "navigation": { "next": "choose_brand" }
     },
-    {
-      "id": "manual_entry",
-      "navigation": { "next": "choose_brand" }
-    },
-    {
-      "id": "choose_brand",
-      "navigation": { "next": "add_devices" }
-    },
+    { "id": "manual_entry" },
+    { "id": "choose_brand" },
     { "id": "add_devices", "template": "add_devices" }
   ],
   "repair": [{ "id": "manual_entry" }]

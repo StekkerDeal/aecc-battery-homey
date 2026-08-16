@@ -1,0 +1,34 @@
+{
+  "pair": {
+    "start": {
+      "title": "AECC batterij toevoegen",
+      "intro": "Automatisch zoeken kan mislukken bij VLAN's, mesh-netwerken of wanneer Homey in een container draait. Het IP-adres zelf invoeren is dus een normale keuze en geen noodoplossing.",
+      "search": "Doorzoek mijn netwerk",
+      "manual": "Voer zelf het IP-adres in"
+    },
+    "manual": {
+      "title": "Voer het IP-adres in",
+      "intro": "De batterij moet bereikbaar zijn op TCP-poort 8080 en accepteert maar één verbinding tegelijk.",
+      "host": "Host",
+      "port": "Poort",
+      "name": "Weergavenaam",
+      "name_hint": "Optioneel. Wordt getoond als apparaatnaam in Homey.",
+      "connect": "Verbinden",
+      "host_required": "Voer een host of IP-adres in.",
+      "failed": "Kan geen verbinding maken met de batterij."
+    },
+    "brand": {
+      "title": "Kies merk",
+      "intro": "Het merk stemt de sensorfiltering af en één AEG-specifiek register. Kies Overig als jouw merk er niet bij staat.",
+      "brand": "Merk",
+      "other": "Overig",
+      "model": "Model",
+      "model_hint": "Optioneel.",
+      "max_charge": "Maximaal laadvermogen",
+      "max_discharge": "Maximaal ontlaadvermogen",
+      "power_hint": "Het lokale protocol begrenst het vermogen op 800W totdat deze app de limiet verhoogt. Ontladen boven 800W vereist ook dat On Grid Output één keer wordt verhoogd in de app van de fabrikant.",
+      "next": "Doorgaan",
+      "failed": "Kon het merk niet opslaan."
+    }
+  }
+}

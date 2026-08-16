@@ -1,78 +1,25 @@
-<!doctype html>
-<html>
-  <head>
-    <meta charset="utf-8" />
-    <style>
-      body {
-        font-family:
-          -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        padding: 20px;
-      }
-      p.intro {
-        color: #555;
-        line-height: 1.5;
-        margin-bottom: 24px;
-      }
-      .choice {
-        display: flex;
-        flex-direction: column;
-        gap: 12px;
-      }
-      button {
-        width: 100%;
-        padding: 14px;
-        font-size: 15px;
-        border: 1px solid #ccc;
-        border-radius: 6px;
-        background: #fff;
-        cursor: pointer;
-        text-align: left;
-      }
-      button.primary {
-        background: #0066cc;
-        color: #fff;
-        border-color: #0066cc;
-      }
-      button:hover {
-        filter: brightness(0.97);
-      }
-    </style>
-  </head>
-  <body>
-    <p class="intro" id="intro"></p>
+<header class="homey-header">
+  <h1 class="homey-title" data-i18n="pair.start.title"></h1>
+  <p class="homey-subtitle" data-i18n="pair.start.intro"></p>
+</header>
 
-    <div class="choice">
-      <button class="primary" id="btnSearch" type="button"></button>
-      <button id="btnManual" type="button"></button>
-    </div>
+<button
+  id="btn-search"
+  class="homey-button-primary-full"
+  data-i18n="pair.start.search"
+></button>
+<button
+  id="btn-manual"
+  class="homey-button-secondary-full"
+  data-i18n="pair.start.manual"
+></button>
 
-    <script type="application/javascript">
-      function onHomeyReady(Homey) {
-        Homey.setTitle(
-          Homey.__({ en: 'Add AECC battery', nl: 'AECC batterij toevoegen' })
-        );
+<script type="application/javascript">
+  document.getElementById('btn-search').addEventListener('click', () => {
+    Homey.showView('list_devices');
+  });
 
-        document.getElementById('intro').textContent = Homey.__({
-          en: 'Discovery can fail across VLANs, mesh networks or when Homey runs in a container, so entering the IP address yourself is a normal choice, not a fallback.',
-          nl: "Automatisch zoeken kan mislukken bij VLAN's, mesh-netwerken of wanneer Homey in een container draait, dus het IP-adres zelf invoeren is een normale keuze en geen noodoplossing.",
-        });
-
-        document.getElementById('btnSearch').textContent = Homey.__({
-          en: 'Search my network',
-          nl: 'Doorzoek mijn netwerk',
-        });
-        document.getElementById('btnManual').textContent = Homey.__({
-          en: 'Enter the IP address myself',
-          nl: 'Voer zelf het IP-adres in',
-        });
-
-        document.getElementById('btnSearch').addEventListener('click', () => {
-          Homey.showView('list_devices');
-        });
-        document.getElementById('btnManual').addEventListener('click', () => {
-          Homey.showView('manual_entry');
-        });
-      }
-    </script>
-  </body>
-</html>
+  document.getElementById('btn-manual').addEventListener('click', () => {
+    Homey.showView('manual_entry');
+  });
+</script>

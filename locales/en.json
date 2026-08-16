@@ -1,0 +1,34 @@
+{
+  "pair": {
+    "start": {
+      "title": "Add AECC battery",
+      "intro": "Discovery can fail across VLANs, mesh networks or when Homey runs in a container, so entering the IP address yourself is a normal choice, not a fallback.",
+      "search": "Search my network",
+      "manual": "Enter the IP address myself"
+    },
+    "manual": {
+      "title": "Enter the IP address",
+      "intro": "The battery must be reachable on TCP port 8080 and serves only one connection at a time.",
+      "host": "Host",
+      "port": "Port",
+      "name": "Display name",
+      "name_hint": "Optional. Shown as the device name in Homey.",
+      "connect": "Connect",
+      "host_required": "Enter a host or IP address.",
+      "failed": "Could not connect to the battery."
+    },
+    "brand": {
+      "title": "Choose brand",
+      "intro": "The brand tunes sensor filtering and one AEG specific register. Pick Other if yours is not listed.",
+      "brand": "Brand",
+      "other": "Other",
+      "model": "Model",
+      "model_hint": "Optional.",
+      "max_charge": "Maximum charge power",
+      "max_discharge": "Maximum discharge power",
+      "power_hint": "The local protocol caps power at 800W until this app raises the limit. Discharging above 800W also needs On Grid Output raised once in the vendor app.",
+      "next": "Continue",
+      "failed": "Could not save the brand."
+    }
+  }
+}
