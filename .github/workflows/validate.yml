@@ -56,16 +56,17 @@ jobs:
           node-version: '24'
           cache: npm
 
-      # The Athom validate action does not run npm ci itself; it invokes
-      # `homey app validate`, which for a TypeScript app runs the build (tsc)
-      # internally. Without this step the compiler is missing and it fails.
       - name: Install dependencies
         run: npm ci
 
+      # Runs the CLI pinned in package-lock rather than Athom's validate
+      # action. That action executes in an Alpine container over this glibc
+      # workspace, so the CLI's transitive sharp binary fails to load with
+      # "Could not load the sharp module using the linuxmusl-x64 runtime".
+      # The pinned CLI is also the exact command and version run locally,
+      # where the action is only SHA-pinned to an untagged master commit.
       - name: Validate app
-        uses: athombv/github-action-homey-app-validate@0f3b42c15d26aab79d7c48cde4d2805524da910e # master
-        with:
-          level: publish
+        run: npm run validate
 
   compose-drift:
     name: Committed app.json matches .homeycompose
