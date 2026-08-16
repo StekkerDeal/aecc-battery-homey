@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="960" viewBox="0 0 960 960">
+  <!-- Sibling of the app icon: same battery frame, nub and corner radii, but
+       a charge level inside instead of the plug. Homey renders driver icons as
+       a monochrome mask, so this is flat black with no background. -->
+  <rect x="400" y="90" width="160" height="90" rx="12" />
+  <path
+    fill-rule="evenodd"
+    d="M286 170h388a56 56 0 0 1 56 56v548a56 56 0 0 1-56 56H286a56 56 0 0 1-56-56V226a56 56 0 0 1 56-56z
+       M326 240h308a26 26 0 0 1 26 26v468a26 26 0 0 1-26 26H326a26 26 0 0 1-26-26V266a26 26 0 0 1 26-26z"
+  />
+  <rect x="360" y="290" width="240" height="110" />
+  <rect x="360" y="445" width="240" height="110" />
+  <rect x="360" y="600" width="240" height="110" />
+</svg>
