@@ -40,7 +40,7 @@ For development or pre-release builds, see [`docs/development.md`](docs/developm
 1. In the Homey app, add a device and pick **AECC Battery**.
 2. Choose **Search my network** (mDNS discovery) or **Enter the IP address myself**. Discovery can miss devices across VLANs, mesh networks, or when Homey runs in a container, so manual entry is a normal choice, not a fallback.
 3. Pick the battery's **brand** (or **Other** if it is not listed). This only tunes sensor-glitch filtering and an AEG-specific register quirk, it does not gate which devices can be added.
-4. Homey adds the device. Open its **Settings** to adjust the port (default 8080), the poll interval (default 5 seconds, 2 second floor), and the max charge/discharge power limits (default 800W each, up to the 2400W hardware maximum).
+4. Homey adds the device. Open its **Settings** to adjust the port (default 8080), the poll interval (default 5 seconds, 2 second floor), and the max charge/discharge power limits (default 800W each). Read [Power limits](#power-limits) before raising those: they limit what this app commands, not what the battery is capable of.
 
 > **Before pairing a second client, read this:** the battery only serves **one TCP connection at a time**. This app, the vendor app's local mode, and the Home Assistant integration all compete for that single slot. Running more than one of them against the same battery at once is the single most common cause of "cannot connect", see Troubleshooting below.
 
@@ -68,9 +68,19 @@ For development or pre-release builds, see [`docs/development.md`](docs/developm
 
 `target_power` is the capability to use for manual control: a single signed number, positive charges, negative discharges, 0 W idles. Setting it to 0 holds an active zero-watt setpoint, which is how you stop the battery, there is no separate "off" state. `target_power` only takes effect while `target_power_mode` is set to **Homey control**; switch it back to **Self-consumption (AI)** to hand control back to the battery's own logic.
 
-Both directions are bounded by the **Max charge power** / **Max discharge power** device settings (default 800W each). A `target_power` value beyond the configured limit is clamped to it, not rejected. Raising either limit above 800W makes the app write register 3039 automatically, lifting the device's own local power cap to match, see [`docs/protocol.md`](docs/protocol.md) for why that register exists.
+### Power limits
 
-**The vendor app has a separate cap this app cannot reach.** Its "On Grid Output" setting (factory default 800W) limits what the inverter actually delivers, and is not exposed over local TCP at all. Raising the device settings above 800W in this app is not enough on its own: to discharge above 800W, "On Grid Output" must also be raised once, in the vendor app, per device.
+**Max charge power** and **Max discharge power** (100 to 2400W each, default 800W) are set during pairing and can be changed in device settings afterwards. They are configured per direction because the two directions have different constraints: feed-in rules and house wiring apply to output only.
+
+**These settings limit this app, not the battery.** They are never written to the battery. They bound the `target_power` slider and clamp whatever a flow card asks for, so the app never commands more than you allow. A value beyond the limit is clamped to it, not rejected.
+
+**Two separate caps decide what actually happens.** The setting here bounds what gets _commanded_. The vendor app's "On Grid Output" setting (factory default 800W) caps what the inverter will actually _deliver_, and is not exposed over local TCP at all. Raising the limit here lifts the device's own local cap to match, but it is not enough on its own: to discharge above 800W, "On Grid Output" must also be raised once in the vendor app, per device.
+
+**In Self-consumption (AI) mode neither setting applies.** The app commands nothing in that mode, so the battery follows its own limits and ignores yours. On a test JET with both Homey limits at 800W and the vendor app at 2400W, the battery charged at 2031W and discharged at 1920W under its own logic. That is expected behaviour, not a bug: switch to **Homey control** if you want your limits to bind.
+
+> **Tip for limited circuits:** to charge fast while keeping output safe, set Max charge power to 2400W, Max discharge power to 800W, and leave "On Grid Output" at 800W in the vendor app. This app then never commands more than 800W of output, and the device enforces the same cap itself.
+
+> **Only raise the discharge limit above 800W when the battery is on its own dedicated circuit.** Doing so is at your own risk, see [Disclaimer](#disclaimer).
 
 **No multi-unit support in this version.** A real master/slave stack shares a single datalogger and a single IP address, and the slave unit does not serve the local API at all, so it cannot be split into separate Homey devices. Such a stack pairs as **one** Homey device showing whole-stack totals, not one device per physical unit. Two batteries that are _not_ stacked, each registered under its own vendor account, have their own IP addresses and pair as two independent Homey devices normally.
 
@@ -136,6 +146,14 @@ If you can reproduce the problem while running a development build (`npm run dev
 The local protocol this app speaks was worked out by the [`aecc-battery-local`](https://github.com/StekkerDeal/aecc-battery-local) Home Assistant integration.
 
 Maintained by [StekkerDeal](https://stekkerdeal.nl/).
+
+## Disclaimer
+
+This app is an independent, community-built project. It is not affiliated with, endorsed by, or supported by AECC or any of the battery brands listed above; those names appear only to describe compatibility.
+
+**Use it at your own risk.** It commands charging and discharging on grid-connected hardware through an undocumented local protocol that was worked out by reverse engineering, and a firmware update can change that protocol without warning. Raising the power limits above the 800W default, either here or in the vendor app, can move more power than your wiring, breaker or socket is rated for. Making sure your installation can carry the power you configure is your responsibility, and if you are not certain, ask a qualified electrician.
+
+Provided as is, without warranty of any kind, as set out in the [LICENSE](LICENSE).
 
 ## License
 

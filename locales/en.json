@@ -26,7 +26,7 @@
       "model_hint": "Optional.",
       "max_charge": "Maximum charge power",
       "max_discharge": "Maximum discharge power",
-      "power_hint": "The local protocol caps power at 800W until this app raises the limit. Discharging above 800W also needs On Grid Output raised once in the vendor app.",
+      "power_hint": "This limits what the app commands, not the battery itself, and does not apply in Self-consumption mode. Discharging above 800W also needs On Grid Output raised once in the vendor app.",
       "next": "Continue",
       "failed": "Could not save the brand."
     }

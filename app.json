@@ -669,8 +669,8 @@
                 "nl": "W"
               },
               "hint": {
-                "en": "The factory default local cap is 800W. Going higher writes register 3039 to unlock it. The vendor app's separate \"On Grid Output\" setting also caps real charge power, and can only be raised in that app.",
-                "nl": "De fabrieksstandaard lokale grens is 800W. Hoger instellen schrijft register 3039 om deze te ontgrendelen. De aparte instelling \"On Grid Output\" in de app van de fabrikant begrenst het werkelijke laadvermogen ook, en kan alleen in die app worden verhoogd."
+                "en": "Limits what this app commands, not what the battery can do, and does not apply in Self-consumption mode. The vendor app's separate \"On Grid Output\" setting caps what the inverter actually delivers and can only be raised there.",
+                "nl": "Begrenst wat deze app stuurt, niet wat de batterij kan, en geldt niet in zelfconsumptiemodus. De aparte instelling \"On Grid Output\" in de app van de fabrikant begrenst wat de omvormer werkelijk levert en kan alleen daar worden verhoogd."
               }
             },
             {
@@ -688,8 +688,8 @@
                 "nl": "W"
               },
               "hint": {
-                "en": "The factory default local cap is 800W. Going higher writes register 3039 to unlock it. The vendor app's separate \"On Grid Output\" setting also caps real discharge power, and can only be raised in that app.",
-                "nl": "De fabrieksstandaard lokale grens is 800W. Hoger instellen schrijft register 3039 om deze te ontgrendelen. De aparte instelling \"On Grid Output\" in de app van de fabrikant begrenst het werkelijke ontlaadvermogen ook, en kan alleen in die app worden verhoogd."
+                "en": "Limits what this app commands, not what the battery can do, and does not apply in Self-consumption mode. The vendor app's separate \"On Grid Output\" setting caps what the inverter actually delivers and can only be raised there.",
+                "nl": "Begrenst wat deze app stuurt, niet wat de batterij kan, en geldt niet in zelfconsumptiemodus. De aparte instelling \"On Grid Output\" in de app van de fabrikant begrenst wat de omvormer werkelijk levert en kan alleen daar worden verhoogd."
               }
             }
           ]
