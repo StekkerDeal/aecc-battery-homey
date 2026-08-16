@@ -116,7 +116,28 @@ describe('decodeSlot', () => {
   });
 
   it('decodes a zero field 3 as idle', () => {
+    expect(decodeSlot('1,00:00,23:59,0,0,6,5,0,0,80,10')).toEqual({
+      direction: 'idle',
+      powerW: 0,
+    });
+  });
+
+  it('decodes the canonical disabled slot as idle', () => {
     expect(decodeSlot('0,00:00,00:00,0,0,0,0,0,0,100,10')).toEqual({
+      direction: 'idle',
+      powerW: 0,
+    });
+  });
+
+  // Register 3009 of the committed JET capture is exactly this shape: the
+  // enable flag is off but field 3 still holds 1000. Reading that as a
+  // setpoint would let a reapply or drift correction command it for real.
+  it('ignores residual power in a disabled slot', () => {
+    expect(decodeSlot('0,00:00,00:00,1000,500,0,0,0,0,100,10')).toEqual({
+      direction: 'idle',
+      powerW: 0,
+    });
+    expect(decodeSlot('0,00:00,00:00,-1000,0,6,5,0,0,80,10')).toEqual({
       direction: 'idle',
       powerW: 0,
     });

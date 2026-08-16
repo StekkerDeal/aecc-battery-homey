@@ -34,6 +34,10 @@ export interface DecodedSlot {
 export function decodeSlot(raw: string): DecodedSlot | null {
   const parts = raw.split(',');
   if (parts.length !== SLOT_FIELD_COUNT) return null;
+  // Field 0 is the enable flag, and a disabled slot can still carry residual
+  // power. Reading that power as a setpoint would let a later reapply or
+  // drift correction write a command the user never gave.
+  if (parts[0] !== '1') return { direction: 'idle', powerW: 0 };
   const field3 = parts[3];
   if (field3 === undefined || !/^-?\d+$/.test(field3)) return null;
   const value = Number(field3);

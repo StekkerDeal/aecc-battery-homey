@@ -564,6 +564,99 @@ describe('AeccSession lifecycle and failure tolerance', () => {
   });
 });
 
+// A glitched SOC sample must not flicker the capability to unknown: the
+// brand profile's holdLastValueSeconds is how long the last accepted value
+// stands in for it. The JET profile holds 120s.
+describe('AeccSession SOC hold window', () => {
+  // SOC 0 while the wall side shows active flow above the brand threshold is
+  // the rejection the Lunergy lockups motivated.
+  function glitchSoc(socket: FakeDeviceSocket): void {
+    socket.frame = {
+      Storage_list: [
+        {
+          DevAddr: 1,
+          StorageSN: 'SN1',
+          BatterySoc: 0,
+          AcChargingPower: 8000,
+          BatteryDischargingPower: 0,
+          AcInActivePower: 0,
+        },
+      ],
+      SSumInfoList: {
+        AverageBatteryAverageSOC: 0,
+        TotalACChargePower: 800,
+        TotalBatteryOutputPower: 0,
+      },
+    };
+  }
+
+  it('holds the last accepted SOC while a rejected sample is inside the window', async () => {
+    const { session, socket } = makeSession();
+    const pending = session.start();
+    await vi.advanceTimersByTimeAsync(2000);
+    await pending;
+    expect(session.snapshot.telemetry?.socPct).toBe(50);
+
+    glitchSoc(socket);
+    await vi.advanceTimersByTimeAsync(2600);
+
+    expect(session.snapshot.telemetry?.socPct).toBe(50);
+    await session.stop();
+  });
+
+  it('gives up and reports unknown once the hold window has expired', async () => {
+    const { session, socket } = makeSession();
+    const pending = session.start();
+    await vi.advanceTimersByTimeAsync(2000);
+    await pending;
+
+    glitchSoc(socket);
+    // Well past the 120s profile window, so the held value is stale enough
+    // that unknown is the honest answer.
+    await vi.advanceTimersByTimeAsync(130_000);
+
+    expect(session.snapshot.telemetry?.socPct).toBeNull();
+    await session.stop();
+  });
+
+  it('does not advance the anchor during a hold, so recovery compares against the last trusted value', async () => {
+    const { session, socket } = makeSession();
+    const pending = session.start();
+    await vi.advanceTimersByTimeAsync(2000);
+    await pending;
+
+    glitchSoc(socket);
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(session.snapshot.telemetry?.socPct).toBe(50);
+
+    // 5% about 63s after the last real sample is roughly 4.8%/min, inside the
+    // JET's 10%/min limit, so it is accepted. Had the hold advanced the anchor
+    // to each glitch poll, the same step would measure from 2.6s ago at about
+    // 115%/min and be rejected, leaving 50 here.
+    socket.frame = {
+      Storage_list: [
+        {
+          DevAddr: 1,
+          StorageSN: 'SN1',
+          BatterySoc: 55,
+          AcChargingPower: 0,
+          BatteryDischargingPower: 0,
+          AcInActivePower: 0,
+        },
+      ],
+      SSumInfoList: {
+        AverageBatteryAverageSOC: 55,
+        TotalACChargePower: 0,
+        TotalBatteryOutputPower: 0,
+      },
+    };
+    await vi.advanceTimersByTimeAsync(2600);
+
+    expect(session.snapshot.telemetry?.socPct).toBe(55);
+    await session.stop();
+  });
+});
+
 describe('AeccSession drift check', () => {
   it('re-applies the commanded setpoint when the device slot has drifted', async () => {
     const { session, socket } = makeSession({

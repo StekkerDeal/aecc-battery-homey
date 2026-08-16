@@ -460,7 +460,22 @@ export class AeccSession {
       profile: getBrandProfile(this.brand),
     };
     const cleaned = cleaner(ctx);
-    if (cleaned === null) return null;
+    if (cleaned === null) {
+      // A rejected sample holds the last accepted value for the brand's hold
+      // window instead of reading unknown, so a glitch does not flicker the
+      // capability. The anchor is deliberately not advanced: the cleaner must
+      // keep comparing against the last value it actually trusted.
+      const last = this.cleanerLastAccepted.get(key);
+      const lastAtMs = this.cleanerLastAcceptedAt.get(key);
+      if (
+        last !== undefined &&
+        lastAtMs !== undefined &&
+        nowMs - lastAtMs <= ctx.profile.holdLastValueSeconds * 1000
+      ) {
+        return last;
+      }
+      return null;
+    }
     this.cleanerLastAccepted.set(key, cleaned);
     this.cleanerLastAcceptedAt.set(key, nowMs);
     return cleaned;
