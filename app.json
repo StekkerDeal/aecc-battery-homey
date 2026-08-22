@@ -21,12 +21,10 @@
   "brandColor": "#00b0e7",
   "tags": {
     "en": [
-      "battery",
       "home battery",
       "plug-in battery",
       "energy storage",
       "local",
-      "AECC",
       "Sunpura",
       "Lunergy",
       "Voltdeer",
@@ -38,21 +36,9 @@
       "Oscal"
     ],
     "nl": [
-      "batterij",
-      "thuisbatterij",
       "stekkerbatterij",
       "energieopslag",
-      "lokaal",
-      "AECC",
-      "Sunpura",
-      "Lunergy",
-      "Voltdeer",
-      "AEG",
-      "Solarcube",
-      "AFERIY",
-      "AccuMate",
-      "JET",
-      "Oscal"
+      "lokaal"
     ]
   },
   "permissions": [],
