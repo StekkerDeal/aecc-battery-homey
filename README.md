@@ -82,7 +82,15 @@ For development or pre-release builds, see [`docs/development.md`](docs/developm
 
 > **Only raise the discharge limit above 800W when the battery is on its own dedicated circuit.** Doing so is at your own risk, see [Disclaimer](#disclaimer).
 
-**No multi-unit support in this version.** A real master/slave stack shares a single datalogger and a single IP address, and the slave unit does not serve the local API at all, so it cannot be split into separate Homey devices. Such a stack pairs as **one** Homey device showing whole-stack totals, not one device per physical unit. Two batteries that are _not_ stacked, each registered under its own vendor account, have their own IP addresses and pair as two independent Homey devices normally.
+## Multi-unit / master-slave stacks
+
+A master/slave stack pairs as **one** Homey device, pointed at the master's IP. The master reports whole-stack totals; the slave does not serve the local API while paired, so it cannot be added as a device of its own. Discovery may still list the slave because it is on the network, but it will refuse the connection.
+
+**Manual control reaches the master only.** The AECC local protocol has no per-unit control, and the master does not forward a locally written setpoint to the other units. On a paired stack the secondary keeps executing whatever schedule the vendor app last gave it. This was established on two AEG Solarcube stacks in [aecc-battery-local#16](https://github.com/StekkerDeal/aecc-battery-local/issues/16): every register the integration writes is confirmed applied and matches the state the app leaves behind, yet only the master responds. The app drives the other units through the cloud, which this app deliberately does not use. Totals of the whole stack are unaffected.
+
+**If you need to control both units**, register each battery separately in the vendor app instead of pairing them, so each gets its own IP and answers on port 8080. Pair each as its own Homey device and let your flows send each one its share of the target.
+
+Keep both units in **Homey control** with your flows as the only thing deciding power. Never leave two separately registered units in Self-consumption (AI) on the same meter: each tries to zero the same reading without knowing the other exists, and they end up charging and discharging against each other at full power ([#2](https://github.com/StekkerDeal/aecc-battery-homey/issues/2)).
 
 ## Flow cards
 
@@ -122,8 +130,8 @@ This is almost always the single-session limit: something else already holds the
 **Discharge or charge power capped below what I set**
 Check the "On Grid Output" setting in the vendor app (Operating Mode Settings). It is a device-level cap on top of this app's own Max charge/discharge power settings, defaults to 800W, and can only be changed in the vendor app; see Control above.
 
-**Multi-unit stack shows only combined totals, not per-battery detail**
-Expected in this version, see "No multi-unit support" under Control above.
+**Multi-unit stack shows only combined totals, and the second unit ignores the setpoint**
+Expected, see Multi-unit / master-slave stacks above.
 
 **Energy totals do not match the Home Assistant integration for the same battery**
 Expected, see Energy totals above.
