@@ -1,9 +1,11 @@
 {
   "id": "nl.stekkerdeal.aecc",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "compatibility": ">=12.13.0",
   "sdk": 3,
-  "platforms": ["local"],
+  "platforms": [
+    "local"
+  ],
   "name": {
     "en": "AECC Plug-and-Play Battery",
     "nl": "AECC Plug-in Thuisbatterij"
@@ -12,7 +14,9 @@
     "en": "Full local control, no cloud connection",
     "nl": "Volledige lokale besturing, zonder cloud"
   },
-  "category": ["energy"],
+  "category": [
+    "energy"
+  ],
   "brandColor": "#00b0e7",
   "tags": {
     "en": [
@@ -45,9 +49,14 @@
     "large": "/assets/images/large.png",
     "xlarge": "/assets/images/xlarge.png"
   },
-  "author": { "name": "StekkerDeal", "email": "info@stekkerdeal.nl" },
+  "author": {
+    "name": "StekkerDeal",
+    "email": "info@stekkerdeal.nl"
+  },
   "support": "https://github.com/StekkerDeal/aecc-battery-homey/issues",
   "source": "https://github.com/StekkerDeal/aecc-battery-homey",
   "homepage": "https://stekkerdeal.nl",
-  "bugs": { "url": "https://github.com/StekkerDeal/aecc-battery-homey/issues" }
+  "bugs": {
+    "url": "https://github.com/StekkerDeal/aecc-battery-homey/issues"
+  }
 }
