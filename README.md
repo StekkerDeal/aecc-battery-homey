@@ -4,24 +4,25 @@
 [![GitHub release](https://img.shields.io/github/release/StekkerDeal/aecc-battery-homey.svg)](https://github.com/StekkerDeal/aecc-battery-homey/releases)
 ![Maintained](https://img.shields.io/badge/maintained-yes-brightgreen.svg)
 
-A Homey app for **local TCP control** of AECC-platform plug-in home batteries: Sunpura, Lunergy, Voltdeer, AEG Solarcube, AFERIY, AccuMate, JET, Oscal and other batteries built on the same white-labelled platform. It talks directly to the battery over your LAN, no cloud round-trip, and exposes charge state, live power flow, energy totals and full charge/discharge control as Homey capabilities and flow cards.
+A Homey app for **local TCP control** of AECC-platform plug-in home batteries: Sunpura, Lunergy, Voltdeer, AEG Solarcube, AFERIY, AccuMate, JET, Oscal, Fossibot and other batteries built on the same white-labelled platform. It talks directly to the battery over your LAN, no cloud round-trip, and exposes charge state, live power flow, energy totals and full charge/discharge control as Homey capabilities and flow cards.
 
 > **Status:** Early / pre-release. The local protocol itself is proven through the sibling Home Assistant integration, [`aecc-battery-local`](https://github.com/StekkerDeal/aecc-battery-local), which has run against real batteries for months. This Homey app is a fresh implementation of the same protocol and has so far only been exercised against a single device (a JET GreenARK Pro loan unit). Expect rough edges, and please open an issue if your device does not behave as documented.
 
 ## Supported devices
 
-Homey-specific testing so far covers only the JET GreenARK Pro, this app's development device. The other rows describe confirmation status on the Home Assistant integration, which speaks the identical protocol; compatibility with this app is expected but not yet independently confirmed on Homey for those. If you try one, please open an issue so this table can be updated.
+Homey-specific testing so far covers the JET GreenARK Pro, this app's development device, and an AEG Solarcube confirmed by a user. The other rows describe confirmation status on the Home Assistant integration, which speaks the identical protocol; compatibility with this app is expected but not yet independently confirmed on Homey for those. If you try one, please open an issue so this table can be updated.
 
 | Brand    | Model              | Tested on Homey | Notes                                                 |
 | -------- | ------------------ | --------------- | ----------------------------------------------------- |
 | JET      | GreenARK Pro       | Yes             | Development device for this app                       |
 | Sunpura  | S2400              | No              | Fully tested on the Home Assistant integration        |
 | Lunergy  | Hub 2400 AC        | No              | Fully tested on the Home Assistant integration        |
-| AEG      | Solarcube          | No              | Community confirmed on the Home Assistant integration |
+| AEG      | Solarcube          | Yes             | Community confirmed                                   |
 | Voltdeer | SR5000             | No              | Community confirmed on the Home Assistant integration |
 | AFERIY   | PS240              | No              | Community confirmed on the Home Assistant integration |
 | AccuMate | Plug-In Battery    | No              | Community confirmed on the Home Assistant integration |
 | Oscal    | Power Storage 2000 | No              | Community confirmed on the Home Assistant integration |
+| Fossibot | FBP 1200           | No              | Community confirmed on the Home Assistant integration |
 
 ## Requirements
 

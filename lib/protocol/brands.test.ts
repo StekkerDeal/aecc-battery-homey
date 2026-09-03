@@ -25,6 +25,7 @@ describe('BRAND_PROFILES', () => {
     'accumate',
     'jet',
     'oscal',
+    'fossibot',
   ])('matches the permissive thresholds for %s', brand => {
     expect(BRAND_PROFILES[brand]).toEqual({
       socZeroRejectDuringActiveW: 200,
@@ -53,6 +54,7 @@ describe('BRAND_LABELS', () => {
       accumate: 'AccuMate',
       jet: 'JET',
       oscal: 'Oscal',
+      fossibot: 'Fossibot',
       other: 'Other',
     });
   });

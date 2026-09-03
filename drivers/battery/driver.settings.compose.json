@@ -123,6 +123,13 @@
             }
           },
           {
+            "id": "fossibot",
+            "label": {
+              "en": "Fossibot",
+              "nl": "Fossibot"
+            }
+          },
+          {
             "id": "other",
             "label": {
               "en": "Other",

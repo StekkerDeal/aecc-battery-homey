@@ -7,6 +7,7 @@ export type BrandId =
   | 'accumate'
   | 'jet'
   | 'oscal'
+  | 'fossibot'
   | 'other';
 
 export type Direction = 'charge' | 'discharge' | 'idle';

@@ -35,24 +35,13 @@
       "AFERIY",
       "AccuMate",
       "JET",
-      "Oscal"
+      "Oscal",
+      "Fossibot"
     ],
     "nl": [
-      "batterij",
-      "thuisbatterij",
       "stekkerbatterij",
       "energieopslag",
-      "lokaal",
-      "AECC",
-      "Sunpura",
-      "Lunergy",
-      "Voltdeer",
-      "AEG",
-      "Solarcube",
-      "AFERIY",
-      "AccuMate",
-      "JET",
-      "Oscal"
+      "lokaal"
     ]
   },
   "permissions": [],
@@ -642,6 +631,13 @@
                   "label": {
                     "en": "Oscal",
                     "nl": "Oscal"
+                  }
+                },
+                {
+                  "id": "fossibot",
+                  "label": {
+                    "en": "Fossibot",
+                    "nl": "Fossibot"
                   }
                 },
                 {

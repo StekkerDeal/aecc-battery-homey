@@ -20,6 +20,7 @@ const BRAND_IDS: readonly BrandId[] = [
   'accumate',
   'jet',
   'oscal',
+  'fossibot',
   'other',
 ];
 
