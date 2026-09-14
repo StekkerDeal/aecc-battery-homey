@@ -6,5 +6,8 @@
   "1.0.1": {
     "en": "Fossibot added as a selectable brand, confirmed on the FBP 1200. AEG Solarcube confirmed working on Homey by a user. Multi-unit stacks: manual control reaches the master only, and the README explains why and what to do if you need to control both units.",
     "nl": "Fossibot toegevoegd als selecteerbaar merk, bevestigd op de FBP 1200. AEG Solarcube door een gebruiker bevestigd werkend op Homey. Master/slave-opstellingen: handmatige besturing bereikt alleen de master; de README legt uit waarom en wat je kunt doen als je beide batterijen wilt aansturen."
+  },
+  "1.1.0": {
+    "en": "TSUN added as a selectable brand, confirmed working on the PowerTrunk MAU5000 and allowed up to 2500W, plus Fossibot now selectable during pairing and two fixes to how the app holds the battery's single connection."
   }
 }
