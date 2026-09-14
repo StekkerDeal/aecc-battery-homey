@@ -10,9 +10,15 @@ import {
   mapDiscoveryResultToPairDevice,
   parseManualConnectPayload,
   parseSetBrandPayload,
+  repairFreshnessWindowS,
   runConnectionProbe,
+  runRepair,
   type PairListDevice,
 } from './driver-pairing';
+import {
+  settingsFrom,
+  type RawSettings,
+} from '../../lib/homey/device-settings';
 import type AeccDevice from './device';
 
 export default class AeccDriver extends Homey.Driver {
@@ -111,23 +117,37 @@ export default class AeccDriver extends Homey.Driver {
           throw new Error(this.collisionMessage(collision));
         }
 
-        const client = new AeccClient({
-          host: payload.host,
-          port: payload.port,
-        });
-        const outcome = await runConnectionProbe(client);
-        if (!outcome.ok) {
+        const aeccDevice = device as AeccDevice;
+        const settings = settingsFrom(device.getSettings() as RawSettings);
+        const outcome = await runRepair(
+          {
+            currentHost: settings.host,
+            currentPort: settings.port,
+            submittedHost: payload.host,
+            submittedPort: payload.port,
+            readingsAreFresh: aeccDevice.isFresh(
+              repairFreshnessWindowS(settings.pollIntervalS)
+            ),
+          },
+          {
+            releaseSession: () => aeccDevice.releaseSession(),
+            probe: (host, port) =>
+              runConnectionProbe(new AeccClient({ host, port })),
+            rebind: async (host, port) => {
+              await device.setSettings({ host, port });
+              // setSettings does not fire onSettings, so the running session
+              // would keep polling the old address while the settings page
+              // shows the new one. The device has to swap it explicitly.
+              await aeccDevice.applyConnectionSettings(host, port);
+            },
+          }
+        );
+
+        // null means the probe was skipped because the device's own session is
+        // already answering at this address, which is a successful repair.
+        if (outcome !== null && !outcome.ok) {
           throw new Error(this.probeFailureMessage(outcome.reason));
         }
-
-        await device.setSettings({ host: payload.host, port: payload.port });
-        // setSettings does not fire onSettings, so the running session would
-        // keep polling the old address while the settings page shows the new
-        // one. The device has to swap it explicitly.
-        await (device as AeccDevice).applyConnectionSettings(
-          payload.host,
-          payload.port
-        );
       }
     );
   }

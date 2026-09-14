@@ -10,13 +10,19 @@ import {
   mapDiscoveryResultToPairDevice,
   parseManualConnectPayload,
   parseSetBrandPayload,
+  planRepair,
+  repairFreshnessWindowS,
   resolveHost,
   resolvePort,
   resolveSerial,
   runConnectionProbe,
+  runRepair,
   type PairListDevice,
   type PairedDeviceLike,
   type ProbeClientLike,
+  type ProbeOutcome,
+  type RepairPlanInput,
+  type RepairRunner,
 } from './driver-pairing';
 import type { DeviceIdentity } from '../../lib/types';
 import type Homey from 'homey';
@@ -426,5 +432,168 @@ describe('runConnectionProbe', () => {
 
     expect(outcome).toEqual({ ok: true, identity: null });
     expect(disconnect).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('planRepair', () => {
+  function input(overrides: Partial<RepairPlanInput> = {}): RepairPlanInput {
+    return {
+      currentHost: '192.168.1.50',
+      currentPort: 8080,
+      submittedHost: '192.168.1.50',
+      submittedPort: 8080,
+      readingsAreFresh: true,
+      ...overrides,
+    };
+  }
+
+  it('probes when the host changed', () => {
+    expect(planRepair(input({ submittedHost: '192.168.1.51' }))).toBe('probe');
+  });
+
+  it('probes when only the port changed', () => {
+    expect(planRepair(input({ submittedPort: 8081 }))).toBe('probe');
+  });
+
+  it('probes a changed address even while the current session is stale', () => {
+    expect(
+      planRepair(
+        input({ submittedHost: '192.168.1.51', readingsAreFresh: false })
+      )
+    ).toBe('probe');
+  });
+
+  // The regression: the device's own running session answers at this address,
+  // and a probe would only take its one session slot away to learn that.
+  it('skips the probe when the address is unchanged and readings are fresh', () => {
+    expect(planRepair(input())).toBe('skip_probe');
+  });
+
+  it('hands the session over first when the address is unchanged and readings are stale', () => {
+    expect(planRepair(input({ readingsAreFresh: false }))).toBe(
+      'release_probe_rebind'
+    );
+  });
+
+  it('treats a retyped hostname as unchanged despite case and whitespace', () => {
+    expect(
+      planRepair(
+        input({ currentHost: 'Aecc.local', submittedHost: ' aecc.LOCAL ' })
+      )
+    ).toBe('skip_probe');
+  });
+});
+
+describe('repairFreshnessWindowS', () => {
+  it('allows three poll intervals', () => {
+    expect(repairFreshnessWindowS(20)).toBe(60);
+  });
+
+  it('never drops below a 30 second floor', () => {
+    expect(repairFreshnessWindowS(5)).toBe(30);
+  });
+});
+
+describe('runRepair', () => {
+  const ok: ProbeOutcome = { ok: true, identity: null };
+
+  function fakeRunner(outcome: ProbeOutcome = ok): {
+    runner: RepairRunner;
+    releaseSession: ReturnType<typeof vi.fn>;
+    probe: ReturnType<typeof vi.fn>;
+    rebind: ReturnType<typeof vi.fn>;
+  } {
+    const releaseSession = vi.fn().mockResolvedValue(undefined);
+    const probe = vi.fn().mockResolvedValue(outcome);
+    const rebind = vi.fn().mockResolvedValue(undefined);
+    return {
+      runner: { releaseSession, probe, rebind },
+      releaseSession,
+      probe,
+      rebind,
+    };
+  }
+
+  function input(overrides: Partial<RepairPlanInput> = {}): RepairPlanInput {
+    return {
+      currentHost: '192.168.1.50',
+      currentPort: 8080,
+      submittedHost: '192.168.1.50',
+      submittedPort: 8080,
+      readingsAreFresh: true,
+      ...overrides,
+    };
+  }
+
+  // The defect: repairing a healthy device to the address it already polls
+  // used to probe against that device's own live socket, lose the fight for
+  // the single session slot, and report a failure with nothing wrong.
+  it('never touches the session when a healthy device is repaired to its own address', async () => {
+    const { runner, releaseSession, probe, rebind } = fakeRunner();
+
+    await expect(runRepair(input(), runner)).resolves.toBeNull();
+
+    expect(probe).not.toHaveBeenCalled();
+    expect(releaseSession).not.toHaveBeenCalled();
+    expect(rebind).not.toHaveBeenCalled();
+  });
+
+  it('probes a changed address without handing the old session over', async () => {
+    const { runner, releaseSession, probe, rebind } = fakeRunner();
+
+    await expect(
+      runRepair(input({ submittedHost: '192.168.1.51' }), runner)
+    ).resolves.toEqual(ok);
+
+    expect(releaseSession).not.toHaveBeenCalled();
+    expect(probe).toHaveBeenCalledWith('192.168.1.51', 8080);
+    expect(rebind).toHaveBeenCalledWith('192.168.1.51', 8080);
+  });
+
+  it('hands the session over before probing a stale device at its own address', async () => {
+    const { runner, releaseSession, probe, rebind } = fakeRunner();
+
+    await expect(
+      runRepair(input({ readingsAreFresh: false }), runner)
+    ).resolves.toEqual(ok);
+
+    expect(releaseSession).toHaveBeenCalledTimes(1);
+    expect(probe).toHaveBeenCalledWith('192.168.1.50', 8080);
+    expect(rebind).toHaveBeenCalledTimes(1);
+  });
+
+  it('restores the session at the old address when the probe fails', async () => {
+    const failure: ProbeOutcome = { ok: false, reason: 'connect_failed' };
+    const { runner, rebind } = fakeRunner(failure);
+
+    await expect(
+      runRepair(input({ readingsAreFresh: false, submittedPort: 8080 }), runner)
+    ).resolves.toEqual(failure);
+
+    expect(rebind).toHaveBeenCalledTimes(1);
+    expect(rebind).toHaveBeenCalledWith('192.168.1.50', 8080);
+  });
+
+  it('restores the session at the old address when the probe throws', async () => {
+    const { runner, rebind } = fakeRunner();
+    runner.probe = vi.fn().mockRejectedValue(new Error('boom'));
+
+    await expect(
+      runRepair(input({ readingsAreFresh: false }), runner)
+    ).rejects.toThrow('boom');
+
+    expect(rebind).toHaveBeenCalledWith('192.168.1.50', 8080);
+  });
+
+  it('leaves a failed probe of a changed address alone, the old session is untouched', async () => {
+    const failure: ProbeOutcome = { ok: false, reason: 'no_valid_data' };
+    const { runner, releaseSession, rebind } = fakeRunner(failure);
+
+    await expect(
+      runRepair(input({ submittedHost: '192.168.1.51' }), runner)
+    ).resolves.toEqual(failure);
+
+    expect(releaseSession).not.toHaveBeenCalled();
+    expect(rebind).not.toHaveBeenCalled();
   });
 });

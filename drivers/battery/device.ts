@@ -171,12 +171,25 @@ export default class AeccDevice extends Homey.Device implements AeccFlowDevice {
     this.pendingStartHandle = null;
   }
 
-  private async rebindSession(settings: AeccDeviceSettings): Promise<void> {
+  // Hands this device's single TCP session slot back so something else can
+  // own it, today the repair probe. Only the polling session goes away; the
+  // meter, capabilities and settings are untouched. Whatever releases it must
+  // pair this with applyConnectionSettings(), which acquires a fresh one:
+  // between the two the device has no session, and a control command arriving
+  // in that window fails honestly rather than reaching the battery.
+  async releaseSession(): Promise<void> {
     const driver = this.driver as AeccDriver;
     this.clearPendingStart();
     this.unsubscribeSession?.();
     this.unsubscribeSession = null;
     await driver.sessions.release(this.registryKey);
+    // Blanked so a later rebind's own release cannot drop the refcount twice.
+    this.registryKey = '';
+  }
+
+  private async rebindSession(settings: AeccDeviceSettings): Promise<void> {
+    const driver = this.driver as AeccDriver;
+    await this.releaseSession();
 
     const newKey = registryKeyFor(settings.host, settings.port);
     let created = false;

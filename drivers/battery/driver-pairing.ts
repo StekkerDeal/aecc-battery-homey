@@ -280,3 +280,106 @@ export async function runConnectionProbe(
     await client.disconnect();
   }
 }
+
+export type RepairAction = 'probe' | 'skip_probe' | 'release_probe_rebind';
+
+export interface RepairPlanInput {
+  currentHost: string;
+  currentPort: number;
+  submittedHost: string;
+  submittedPort: number;
+  readingsAreFresh: boolean;
+}
+
+function sameAddress(
+  currentHost: string,
+  currentPort: number,
+  submittedHost: string,
+  submittedPort: number
+): boolean {
+  // Case-insensitive and trimmed so a hostname retyped in a different case
+  // reads as unchanged; IP addresses are unaffected either way.
+  return (
+    currentHost.trim().toLowerCase() === submittedHost.trim().toLowerCase() &&
+    currentPort === submittedPort
+  );
+}
+
+/**
+ * Decides what a repair should do before probing the submitted address.
+ *
+ * The device serves one TCP session at a time, so a repair to the address the
+ * device already uses would probe against that device's own live socket and
+ * typically lose, reporting a failure when nothing is wrong. Handing the slot
+ * over is itself a risk (the device only accepts a new client for a short
+ * window after it frees one), so the healthy case gives up no handover at all.
+ */
+export function planRepair(input: RepairPlanInput): RepairAction {
+  if (
+    !sameAddress(
+      input.currentHost,
+      input.currentPort,
+      input.submittedHost,
+      input.submittedPort
+    )
+  ) {
+    // A different address cannot collide with this device's own session.
+    return 'probe';
+  }
+  // A session still delivering fresh readings is itself the proof the address
+  // works, so there is nothing a probe could add.
+  return input.readingsAreFresh ? 'skip_probe' : 'release_probe_rebind';
+}
+
+const REPAIR_FRESH_FLOOR_S = 30;
+
+// How recent the last good poll must be for a repair to trust the running
+// session instead of probing. Three poll intervals tolerates a couple of
+// missed polls, with a floor so a long poll interval does not make every
+// repair look stale.
+export function repairFreshnessWindowS(pollIntervalS: number): number {
+  return Math.max(REPAIR_FRESH_FLOOR_S, pollIntervalS * 3);
+}
+
+export interface RepairRunner {
+  /** Stops the device's session so the probe can own its one TCP slot. */
+  releaseSession(): Promise<void>;
+  /** Opens a throwaway client at this address and closes it again. */
+  probe(host: string, port: number): Promise<ProbeOutcome>;
+  /** Persists this address and binds a session onto it. */
+  rebind(host: string, port: number): Promise<void>;
+}
+
+/**
+ * Runs one repair against the submitted address, returning null when the
+ * probe was skipped because the running session already proves the address
+ * works, and the probe outcome otherwise. Translating a failed outcome into a
+ * user-facing message stays with the driver, which owns the localiser.
+ */
+export async function runRepair(
+  input: RepairPlanInput,
+  runner: RepairRunner
+): Promise<ProbeOutcome | null> {
+  const action = planRepair(input);
+  if (action === 'skip_probe') return null;
+  if (action === 'release_probe_rebind') await runner.releaseSession();
+
+  let rebound = false;
+  try {
+    const outcome = await runner.probe(
+      input.submittedHost,
+      input.submittedPort
+    );
+    if (!outcome.ok) return outcome;
+    await runner.rebind(input.submittedHost, input.submittedPort);
+    rebound = true;
+    return outcome;
+  } finally {
+    // A session handed over for the probe has to come back even when the
+    // probe failed or threw, or a failed repair leaves the device with no
+    // session at all.
+    if (!rebound && action === 'release_probe_rebind') {
+      await runner.rebind(input.currentHost, input.currentPort);
+    }
+  }
+}
