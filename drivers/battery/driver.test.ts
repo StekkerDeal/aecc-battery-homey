@@ -210,6 +210,27 @@ describe('parseSetBrandPayload', () => {
     expect(parsed.maxChargePowerW).toBe(800);
     expect(parsed.maxDischargePowerW).toBe(800);
   });
+
+  // The wizard's power inputs carry no maximum of their own.
+  it('caps the power limits at the ceiling of the brand chosen alongside them', () => {
+    const parsed = parseSetBrandPayload({
+      brand: 'jet',
+      max_charge_power: 2500,
+      max_discharge_power: 5000,
+    });
+    expect(parsed.maxChargePowerW).toBe(2400);
+    expect(parsed.maxDischargePowerW).toBe(2400);
+  });
+
+  it('lets TSUN through at 2500W', () => {
+    const parsed = parseSetBrandPayload({
+      brand: 'tsun',
+      max_charge_power: 2500,
+      max_discharge_power: 2500,
+    });
+    expect(parsed.maxChargePowerW).toBe(2500);
+    expect(parsed.maxDischargePowerW).toBe(2500);
+  });
 });
 
 describe('buildManualPairDevice', () => {

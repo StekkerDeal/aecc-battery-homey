@@ -100,11 +100,22 @@ int key (`"3003"` vs `3003`) depending on firmware; check both.
 The device firmware clamps whatever power value is written to register 3003
 against register 3039. Register 3039 defaults to an effective 800W, which is
 the origin of the "cannot get above 800W locally" reports. Writing 3039 to a
-higher value (hardware maximum 2400W) before or alongside the 3003 write
-unlocks the higher range over local TCP. This app raises 3039 automatically
-whenever a device setting's configured power limit exceeds 800W; a
-contributor adding a new control path must do the same or setpoints above
-800W will be silently clamped by the device.
+higher value before or alongside the 3003 write unlocks the higher range over
+local TCP. This app raises 3039 automatically whenever a device setting's
+configured power limit exceeds 800W; a contributor adding a new control path
+must do the same or setpoints above 800W will be silently clamped by the
+device.
+
+**The upper end of that range is per brand, not universal.** 2400W is the
+platform default and what every brand gets unless it has been measured higher.
+The TSUN PowerTrunk MAU5000 is unlocked to 2500W: on 2026-09-14 it reported
+2621W of discharge while an independently wired HomeWizard meter read 2490W at
+the wall. `getBrandMaxPowerW()` in `lib/protocol/brands.ts` is the single
+source for this, and a new brand belongs in that map only once it has been
+measured above 2400W. Note that Homey declares a settings field's range and a
+flow card's argument range in the manifest with no way to vary either per
+device, so both are declared at the widest brand's value and narrowed in code;
+`settingsFrom()` is where that narrowing happens.
 
 This is a **different cap** from the vendor app's "On Grid Output" setting
 (factory default 800W, under Operating Mode Settings), which limits what the

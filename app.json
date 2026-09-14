@@ -211,8 +211,8 @@
           "nl": "Laad op met [[power]]"
         },
         "hint": {
-          "en": "Sets the mode to Homey control and charges at this power. Also callable from HomeyScript.",
-          "nl": "Zet de modus op Homey-besturing en laadt op met dit vermogen. Ook aanroepbaar vanuit HomeyScript."
+          "en": "Sets the mode to Homey control and charges at this power. Also callable from HomeyScript. Anything above the device's Max charge power setting is reduced to it.",
+          "nl": "Zet de modus op Homey-besturing en laadt op met dit vermogen. Ook aanroepbaar vanuit HomeyScript. Alles boven de instelling Max. laadvermogen van het apparaat wordt daarnaar teruggebracht."
         },
         "args": [
           {
@@ -228,7 +228,7 @@
               "nl": "Vermogen"
             },
             "min": 0,
-            "max": 2400,
+            "max": 2500,
             "step": 10,
             "label": {
               "en": "W",
@@ -248,8 +248,8 @@
           "nl": "Ontlaad met [[power]]"
         },
         "hint": {
-          "en": "Sets the mode to Homey control and discharges at this power. Also callable from HomeyScript.",
-          "nl": "Zet de modus op Homey-besturing en ontlaadt met dit vermogen. Ook aanroepbaar vanuit HomeyScript."
+          "en": "Sets the mode to Homey control and discharges at this power. Also callable from HomeyScript. Anything above the device's Max discharge power setting is reduced to it.",
+          "nl": "Zet de modus op Homey-besturing en ontlaadt met dit vermogen. Ook aanroepbaar vanuit HomeyScript. Alles boven de instelling Max. ontlaadvermogen van het apparaat wordt daarnaar teruggebracht."
         },
         "args": [
           {
@@ -265,7 +265,7 @@
               "nl": "Vermogen"
             },
             "min": 0,
-            "max": 2400,
+            "max": 2500,
             "step": 10,
             "label": {
               "en": "W",
@@ -442,8 +442,8 @@
           }
         },
         "target_power": {
-          "min": -2400,
-          "max": 2400,
+          "min": -2500,
+          "max": 2500,
           "step": 10,
           "decimals": 0
         },
@@ -703,14 +703,14 @@
               },
               "value": 800,
               "min": 100,
-              "max": 2400,
+              "max": 2500,
               "units": {
                 "en": "W",
                 "nl": "W"
               },
               "hint": {
-                "en": "Limits what this app commands, not what the battery can do, and does not apply in Self-consumption mode. The vendor app's separate \"On Grid Output\" setting caps what the inverter actually delivers and can only be raised there.",
-                "nl": "Begrenst wat deze app stuurt, niet wat de batterij kan, en geldt niet in zelfconsumptiemodus. De aparte instelling \"On Grid Output\" in de app van de fabrikant begrenst wat de omvormer werkelijk levert en kan alleen daar worden verhoogd."
+                "en": "Limits what this app commands, not what the battery can do, and does not apply in Self-consumption mode. The usable maximum is 2500W on TSUN and 2400W on every other brand, and a higher value is reduced to that. The vendor app's separate \"On Grid Output\" setting caps what the inverter actually delivers and can only be raised there.",
+                "nl": "Begrenst wat deze app stuurt, niet wat de batterij kan, en geldt niet in zelfconsumptiemodus. Het bruikbare maximum is 2500W bij TSUN en 2400W bij elk ander merk; een hogere waarde wordt daarnaar teruggebracht. De aparte instelling \"On Grid Output\" in de app van de fabrikant begrenst wat de omvormer werkelijk levert en kan alleen daar worden verhoogd."
               }
             },
             {
@@ -722,14 +722,14 @@
               },
               "value": 800,
               "min": 100,
-              "max": 2400,
+              "max": 2500,
               "units": {
                 "en": "W",
                 "nl": "W"
               },
               "hint": {
-                "en": "Limits what this app commands, not what the battery can do, and does not apply in Self-consumption mode. The vendor app's separate \"On Grid Output\" setting caps what the inverter actually delivers and can only be raised there.",
-                "nl": "Begrenst wat deze app stuurt, niet wat de batterij kan, en geldt niet in zelfconsumptiemodus. De aparte instelling \"On Grid Output\" in de app van de fabrikant begrenst wat de omvormer werkelijk levert en kan alleen daar worden verhoogd."
+                "en": "Limits what this app commands, not what the battery can do, and does not apply in Self-consumption mode. The usable maximum is 2500W on TSUN and 2400W on every other brand, and a higher value is reduced to that. The vendor app's separate \"On Grid Output\" setting caps what the inverter actually delivers and can only be raised there.",
+                "nl": "Begrenst wat deze app stuurt, niet wat de batterij kan, en geldt niet in zelfconsumptiemodus. Het bruikbare maximum is 2500W bij TSUN en 2400W bij elk ander merk; een hogere waarde wordt daarnaar teruggebracht. De aparte instelling \"On Grid Output\" in de app van de fabrikant begrenst wat de omvormer werkelijk levert en kan alleen daar worden verhoogd."
               }
             }
           ]

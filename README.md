@@ -55,7 +55,7 @@ For development or pre-release builds, see [`docs/development.md`](docs/developm
 | `battery_charging_state`         | -    | Homey's standard charging-state enum (`charging` / `discharging` / `idle`), derived from `measure_power` with a 25W deadband, so the standby draw of a stopped battery still reads `idle` |
 | `meter_power.charged`            | kWh  | Locally integrated charged energy total. See Energy totals below                                                                                                                          |
 | `meter_power.discharged`         | kWh  | Locally integrated discharged energy total. See Energy totals below                                                                                                                       |
-| `target_power`                   | W    | Signed setpoint, -2400 to 2400: positive = charge, negative = discharge, 0 = idle. Requires Homey firmware 12.13.0 or newer                                                               |
+| `target_power`                   | W    | Signed setpoint, -2400 to 2400 (-2500 to 2500 on TSUN): positive = charge, negative = discharge, 0 = idle. Requires Homey firmware 12.13.0 or newer                                       |
 | `target_power_mode`              | -    | `device` (Self-consumption / AI) hands control back to the battery's own logic; `homey` (Homey control) makes `target_power` authoritative                                                |
 | `aecc_min_soc` (Discharge limit) | %    | Battery stops discharging at this SOC, 5-50%                                                                                                                                              |
 | `aecc_max_soc` (Charge limit)    | %    | Battery stops charging at this SOC, 50-100%                                                                                                                                               |
@@ -73,6 +73,8 @@ For development or pre-release builds, see [`docs/development.md`](docs/developm
 ### Power limits
 
 **Max charge power** and **Max discharge power** (100 to 2400W each, default 800W) are set during pairing and can be changed in device settings afterwards. They are configured per direction because the two directions have different constraints: feed-in rules and house wiring apply to output only.
+
+**The ceiling is 2500W on TSUN and 2400W on every other brand.** Only a model measured above 2400W gets a higher ceiling, and so far that is the TSUN PowerTrunk MAU5000. Homey cannot vary a settings field's range per device, so the field and both power flow cards offer up to 2500W whatever brand you picked; anything above your brand's ceiling is quietly reduced to it rather than commanded.
 
 **These settings limit this app, not the battery.** They are never written to the battery. They bound the `target_power` slider and clamp whatever a flow card asks for, so the app never commands more than you allow. A value beyond the limit is clamped to it, not rejected.
 
@@ -116,8 +118,8 @@ This app defines 9 custom flow cards: 3 triggers, 1 condition and 5 actions. The
 
 | Card                            | ID                    | Arguments                                              | What it does                                                                                                                                         |
 | ------------------------------- | --------------------- | ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Charge at a set power           | `set_charge_power`    | `power` (0-2400W, step 10)                             | Sets the mode to Homey control and charges at this power. Also callable from HomeyScript                                                             |
-| Discharge at a set power        | `set_discharge_power` | `power` (0-2400W, step 10)                             | Sets the mode to Homey control and discharges at this power. Also callable from HomeyScript                                                          |
+| Charge at a set power           | `set_charge_power`    | `power` (0-2500W, step 10)                             | Sets the mode to Homey control and charges at this power, reduced to Max charge power if it asks for more                                            |
+| Discharge at a set power        | `set_discharge_power` | `power` (0-2500W, step 10)                             | Sets the mode to Homey control and discharges at this power, reduced to Max discharge power if it asks for more                                      |
 | Stop                            | `stop_battery`        | none                                                   | Holds an active 0W setpoint with energy management still enabled, unlike switching to self-consumption mode, which hands control back to the battery |
 | Set charge and discharge limits | `set_soc_limits`      | `min_soc` (5-50%, step 5), `max_soc` (50-100%, step 5) | Sets the discharge limit to `min_soc` and the charge limit to `max_soc` in a single card                                                             |
 | Reapply the setpoint            | `reapply_setpoint`    | none                                                   | Rewrites the current target power to the battery without changing its value. Useful as a recovery step after a failed control command                |

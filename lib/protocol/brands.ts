@@ -59,6 +59,29 @@ export function getBrandProfile(brand: BrandId): BrandProfile {
   return BRAND_PROFILES[brand] ?? BRAND_PROFILES.other;
 }
 
+// The highest power this app will ever command, per brand. Deliberately not
+// part of BrandProfile, which is only about cleaning noisy sensor readings.
+//
+// 2400W is the platform default and the documented ceiling for register 3039
+// (docs/protocol.md). Only a brand measured above it gets its own entry: the
+// TSUN PowerTrunk MAU5000 is unlocked to 2500W and on 2026-09-14 reported
+// 2621W of discharge while an independently wired HomeWizard meter read 2490W
+// at the wall.
+//
+// This is the single source for the ceiling. It has to live in code because
+// Homey declares a settings field's range and a flow card's argument range in
+// the manifest, with no way to vary either per device, so both are declared at
+// the widest brand's value and narrowed here instead.
+export const DEFAULT_MAX_POWER_W = 2400;
+
+const BRAND_MAX_POWER_W: Partial<Record<BrandId, number>> = {
+  tsun: 2500,
+};
+
+export function getBrandMaxPowerW(brand: BrandId): number {
+  return BRAND_MAX_POWER_W[brand] ?? DEFAULT_MAX_POWER_W;
+}
+
 // AEG mirrors its own app: Customized mode leaves 3020 at 3 instead of the
 // custom-schedule value 6 every other brand uses.
 export function scheduleModeCustom(brand: BrandId): string {

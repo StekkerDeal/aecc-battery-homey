@@ -107,8 +107,8 @@
         "nl": "Laad op met [[power]]"
       },
       "hint": {
-        "en": "Sets the mode to Homey control and charges at this power. Also callable from HomeyScript.",
-        "nl": "Zet de modus op Homey-besturing en laadt op met dit vermogen. Ook aanroepbaar vanuit HomeyScript."
+        "en": "Sets the mode to Homey control and charges at this power. Also callable from HomeyScript. Anything above the device's Max charge power setting is reduced to it.",
+        "nl": "Zet de modus op Homey-besturing en laadt op met dit vermogen. Ook aanroepbaar vanuit HomeyScript. Alles boven de instelling Max. laadvermogen van het apparaat wordt daarnaar teruggebracht."
       },
       "args": [
         {
@@ -116,7 +116,7 @@
           "type": "number",
           "title": { "en": "Power", "nl": "Vermogen" },
           "min": 0,
-          "max": 2400,
+          "max": 2500,
           "step": 10,
           "label": { "en": "W", "nl": "W" }
         }
@@ -133,8 +133,8 @@
         "nl": "Ontlaad met [[power]]"
       },
       "hint": {
-        "en": "Sets the mode to Homey control and discharges at this power. Also callable from HomeyScript.",
-        "nl": "Zet de modus op Homey-besturing en ontlaadt met dit vermogen. Ook aanroepbaar vanuit HomeyScript."
+        "en": "Sets the mode to Homey control and discharges at this power. Also callable from HomeyScript. Anything above the device's Max discharge power setting is reduced to it.",
+        "nl": "Zet de modus op Homey-besturing en ontlaadt met dit vermogen. Ook aanroepbaar vanuit HomeyScript. Alles boven de instelling Max. ontlaadvermogen van het apparaat wordt daarnaar teruggebracht."
       },
       "args": [
         {
@@ -142,7 +142,7 @@
           "type": "number",
           "title": { "en": "Power", "nl": "Vermogen" },
           "min": 0,
-          "max": 2400,
+          "max": 2500,
           "step": 10,
           "label": { "en": "W", "nl": "W" }
         }

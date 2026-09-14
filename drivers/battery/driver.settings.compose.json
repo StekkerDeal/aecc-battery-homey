@@ -191,14 +191,14 @@
         },
         "value": 800,
         "min": 100,
-        "max": 2400,
+        "max": 2500,
         "units": {
           "en": "W",
           "nl": "W"
         },
         "hint": {
-          "en": "Limits what this app commands, not what the battery can do, and does not apply in Self-consumption mode. The vendor app's separate \"On Grid Output\" setting caps what the inverter actually delivers and can only be raised there.",
-          "nl": "Begrenst wat deze app stuurt, niet wat de batterij kan, en geldt niet in zelfconsumptiemodus. De aparte instelling \"On Grid Output\" in de app van de fabrikant begrenst wat de omvormer werkelijk levert en kan alleen daar worden verhoogd."
+          "en": "Limits what this app commands, not what the battery can do, and does not apply in Self-consumption mode. The usable maximum is 2500W on TSUN and 2400W on every other brand, and a higher value is reduced to that. The vendor app's separate \"On Grid Output\" setting caps what the inverter actually delivers and can only be raised there.",
+          "nl": "Begrenst wat deze app stuurt, niet wat de batterij kan, en geldt niet in zelfconsumptiemodus. Het bruikbare maximum is 2500W bij TSUN en 2400W bij elk ander merk; een hogere waarde wordt daarnaar teruggebracht. De aparte instelling \"On Grid Output\" in de app van de fabrikant begrenst wat de omvormer werkelijk levert en kan alleen daar worden verhoogd."
         }
       },
       {
@@ -210,14 +210,14 @@
         },
         "value": 800,
         "min": 100,
-        "max": 2400,
+        "max": 2500,
         "units": {
           "en": "W",
           "nl": "W"
         },
         "hint": {
-          "en": "Limits what this app commands, not what the battery can do, and does not apply in Self-consumption mode. The vendor app's separate \"On Grid Output\" setting caps what the inverter actually delivers and can only be raised there.",
-          "nl": "Begrenst wat deze app stuurt, niet wat de batterij kan, en geldt niet in zelfconsumptiemodus. De aparte instelling \"On Grid Output\" in de app van de fabrikant begrenst wat de omvormer werkelijk levert en kan alleen daar worden verhoogd."
+          "en": "Limits what this app commands, not what the battery can do, and does not apply in Self-consumption mode. The usable maximum is 2500W on TSUN and 2400W on every other brand, and a higher value is reduced to that. The vendor app's separate \"On Grid Output\" setting caps what the inverter actually delivers and can only be raised there.",
+          "nl": "Begrenst wat deze app stuurt, niet wat de batterij kan, en geldt niet in zelfconsumptiemodus. Het bruikbare maximum is 2500W bij TSUN en 2400W bij elk ander merk; een hogere waarde wordt daarnaar teruggebracht. De aparte instelling \"On Grid Output\" in de app van de fabrikant begrenst wat de omvormer werkelijk levert en kan alleen daar worden verhoogd."
         }
       }
     ]

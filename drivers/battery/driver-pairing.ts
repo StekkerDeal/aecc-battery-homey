@@ -6,6 +6,7 @@
 // driver.test.ts exercise the actual pairing logic instead of skipping it.
 import type Homey from 'homey';
 import { parseEnergyFrame } from '../../lib/protocol/telemetry';
+import { getBrandMaxPowerW } from '../../lib/protocol/brands';
 import { MAX_REGISTER_POWER_DEFAULT } from '../../lib/protocol/registers';
 import type { BrandId, DeviceIdentity } from '../../lib/types';
 
@@ -137,19 +138,23 @@ export interface SetBrandPayload {
   maxDischargePowerW: number;
 }
 
+// The wizard's two power fields are plain number inputs with no maximum of
+// their own, so the brand's ceiling is applied here, against the brand chosen
+// on the very same screen.
 export function parseSetBrandPayload(data: unknown): SetBrandPayload {
   const record = asRecord(data);
   const brandRaw = record.brand;
   const brand: BrandId =
     typeof brandRaw === 'string' && isBrandId(brandRaw) ? brandRaw : 'other';
   const model = typeof record.model === 'string' ? record.model.trim() : '';
-  const maxChargePowerW = toPositiveInt(
-    record.max_charge_power,
-    MAX_REGISTER_POWER_DEFAULT
+  const ceilingW = getBrandMaxPowerW(brand);
+  const maxChargePowerW = Math.min(
+    toPositiveInt(record.max_charge_power, MAX_REGISTER_POWER_DEFAULT),
+    ceilingW
   );
-  const maxDischargePowerW = toPositiveInt(
-    record.max_discharge_power,
-    MAX_REGISTER_POWER_DEFAULT
+  const maxDischargePowerW = Math.min(
+    toPositiveInt(record.max_discharge_power, MAX_REGISTER_POWER_DEFAULT),
+    ceilingW
   );
   return { brand, model, maxChargePowerW, maxDischargePowerW };
 }

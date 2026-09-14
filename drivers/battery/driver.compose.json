@@ -48,8 +48,8 @@
       "title": { "en": "Discharged energy", "nl": "Ontladen energie" }
     },
     "target_power": {
-      "min": -2400,
-      "max": 2400,
+      "min": -2500,
+      "max": 2500,
       "step": 10,
       "decimals": 0
     },

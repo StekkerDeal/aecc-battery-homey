@@ -67,6 +67,51 @@ describe('settingsFrom', () => {
     });
   });
 
+  // The settings page offers 2500W to every brand because Homey cannot vary a
+  // field's range per device, so the brand's real ceiling binds here instead.
+  it('caps both power limits at the brand ceiling', () => {
+    const raw: RawSettings = {
+      brand: 'jet',
+      max_charge_power: 2500,
+      max_discharge_power: 2500,
+    };
+
+    expect(settingsFrom(raw).maxChargePowerW).toBe(2400);
+    expect(settingsFrom(raw).maxDischargePowerW).toBe(2400);
+  });
+
+  it('lets TSUN keep 2500W', () => {
+    const raw: RawSettings = {
+      brand: 'tsun',
+      max_charge_power: 2500,
+      max_discharge_power: 2500,
+    };
+
+    expect(settingsFrom(raw).maxChargePowerW).toBe(2500);
+    expect(settingsFrom(raw).maxDischargePowerW).toBe(2500);
+  });
+
+  it('leaves a value below the ceiling untouched', () => {
+    const raw: RawSettings = {
+      brand: 'tsun',
+      max_charge_power: 800,
+      max_discharge_power: 1200,
+    };
+
+    expect(settingsFrom(raw).maxChargePowerW).toBe(800);
+    expect(settingsFrom(raw).maxDischargePowerW).toBe(1200);
+  });
+
+  it('caps an unbranded device at the default ceiling', () => {
+    const raw: RawSettings = {
+      max_charge_power: 9000,
+      max_discharge_power: 9000,
+    };
+
+    expect(settingsFrom(raw).maxChargePowerW).toBe(2400);
+    expect(settingsFrom(raw).maxDischargePowerW).toBe(2400);
+  });
+
   it('applies the same defaults when the keys are explicitly null or undefined', () => {
     const raw: RawSettings = {
       host: null,

@@ -3,6 +3,8 @@ import type { BrandId } from '../types';
 import {
   BRAND_LABELS,
   BRAND_PROFILES,
+  DEFAULT_MAX_POWER_W,
+  getBrandMaxPowerW,
   getBrandProfile,
   scheduleModeCustom,
   slotField6,
@@ -69,6 +71,31 @@ describe('getBrandProfile', () => {
 
   it('falls back to the other profile for an unknown brand', () => {
     expect(getBrandProfile('made-up' as BrandId)).toBe(BRAND_PROFILES.other);
+  });
+});
+
+describe('getBrandMaxPowerW', () => {
+  it('gives TSUN the measured 2500W ceiling', () => {
+    expect(getBrandMaxPowerW('tsun')).toBe(2500);
+  });
+
+  it.each<BrandId>([
+    'lunergy',
+    'sunpura',
+    'voltdeer',
+    'aeg',
+    'aferiy',
+    'accumate',
+    'jet',
+    'oscal',
+    'fossibot',
+    'other',
+  ])('keeps %s at the 2400W platform default', brand => {
+    expect(getBrandMaxPowerW(brand)).toBe(DEFAULT_MAX_POWER_W);
+  });
+
+  it('falls back to the default for an unknown brand', () => {
+    expect(getBrandMaxPowerW('made-up' as BrandId)).toBe(DEFAULT_MAX_POWER_W);
   });
 });
 
