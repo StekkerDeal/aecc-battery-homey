@@ -4,13 +4,13 @@
 [![GitHub release](https://img.shields.io/github/release/StekkerDeal/aecc-battery-homey.svg)](https://github.com/StekkerDeal/aecc-battery-homey/releases)
 ![Maintained](https://img.shields.io/badge/maintained-yes-brightgreen.svg)
 
-A Homey app for **local TCP control** of AECC-platform plug-in home batteries: Sunpura, Lunergy, Voltdeer, AEG Solarcube, AFERIY, AccuMate, JET, Oscal, Fossibot and other batteries built on the same white-labelled platform. It talks directly to the battery over your LAN, no cloud round-trip, and exposes charge state, live power flow, energy totals and full charge/discharge control as Homey capabilities and flow cards.
+A Homey app for **local TCP control** of AECC-platform plug-in home batteries: Sunpura, Lunergy, Voltdeer, AEG Solarcube, AFERIY, AccuMate, JET, Oscal, Fossibot, TSUN and other batteries built on the same white-labelled platform. It talks directly to the battery over your LAN, no cloud round-trip, and exposes charge state, live power flow, energy totals and full charge/discharge control as Homey capabilities and flow cards.
 
-> **Status:** Early / pre-release. The local protocol itself is proven through the sibling Home Assistant integration, [`aecc-battery-local`](https://github.com/StekkerDeal/aecc-battery-local), which has run against real batteries for months. This Homey app is a fresh implementation of the same protocol and has so far only been exercised against a single device (a JET GreenARK Pro loan unit). Expect rough edges, and please open an issue if your device does not behave as documented.
+> **Status:** Early / pre-release. The local protocol itself is proven through the sibling Home Assistant integration, [`aecc-battery-local`](https://github.com/StekkerDeal/aecc-battery-local), which has run against real batteries for months. This Homey app is a fresh implementation of the same protocol and has so far been exercised against two devices (a JET GreenARK Pro loan unit and a TSUN PowerTrunk MAU5000). Expect rough edges, and please open an issue if your device does not behave as documented.
 
 ## Supported devices
 
-Homey-specific testing so far covers the JET GreenARK Pro, this app's development device, and an AEG Solarcube confirmed by a user. The other rows describe confirmation status on the Home Assistant integration, which speaks the identical protocol; compatibility with this app is expected but not yet independently confirmed on Homey for those. If you try one, please open an issue so this table can be updated.
+Homey-specific testing so far covers the JET GreenARK Pro, this app's development device, a TSUN PowerTrunk MAU5000, and an AEG Solarcube confirmed by a user. The other rows describe confirmation status on the Home Assistant integration, which speaks the identical protocol; compatibility with this app is expected but not yet independently confirmed on Homey for those. If you try one, please open an issue so this table can be updated.
 
 | Brand    | Model              | Tested on Homey | Notes                                                 |
 | -------- | ------------------ | --------------- | ----------------------------------------------------- |
@@ -23,6 +23,7 @@ Homey-specific testing so far covers the JET GreenARK Pro, this app's developmen
 | AccuMate | Plug-In Battery    | No              | Community confirmed on the Home Assistant integration |
 | Oscal    | Power Storage 2000 | No              | Community confirmed on the Home Assistant integration |
 | Fossibot | FBP 1200           | No              | Community confirmed on the Home Assistant integration |
+| TSUN     | PowerTrunk MAU5000 | Yes             | Confirmed working                                     |
 
 ## Requirements
 
@@ -127,6 +128,11 @@ Purpose-built flow cards beyond these may be added in a later version; if you ne
 
 **"Cannot connect" during pairing or afterwards**
 This is almost always the single-session limit: something else already holds the battery's one TCP slot. Close the vendor app's local connection and disable the Home Assistant integration (or vice versa) before pairing or troubleshooting this app, then try again.
+
+**Nothing can connect any more, and restarting does not help**
+The battery only accepts a new local client for roughly the **first 30 seconds** after its datalogger restarts. Outside that window it simply stays silent, so a client whose retry backoff has grown past half a minute can never get back in on its own, and neither restarting Homey nor power-cycling the battery changes that. It also means a client that abandons a socket without closing it keeps the slot indefinitely, because nothing else can ever claim it.
+
+To recover: make sure only one client will be trying, restart the datalogger from the vendor app, and have that one client connect immediately afterwards rather than waiting for its own retry.
 
 **Discharge or charge power capped below what I set**
 Check the "On Grid Output" setting in the vendor app (Operating Mode Settings). It is a device-level cap on top of this app's own Max charge/discharge power settings, defaults to 800W, and can only be changed in the vendor app; see Control above.

@@ -37,6 +37,7 @@ export const BRAND_PROFILES: Record<BrandId, BrandProfile> = {
   jet: PERMISSIVE,
   oscal: PERMISSIVE,
   fossibot: PERMISSIVE,
+  tsun: PERMISSIVE,
   other: OTHER,
 };
 
@@ -50,6 +51,7 @@ export const BRAND_LABELS: Record<BrandId, string> = {
   jet: 'JET',
   oscal: 'Oscal',
   fossibot: 'Fossibot',
+  tsun: 'TSUN',
   other: 'Other',
 };
 

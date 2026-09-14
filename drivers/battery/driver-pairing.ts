@@ -21,6 +21,7 @@ const BRAND_IDS: readonly BrandId[] = [
   'jet',
   'oscal',
   'fossibot',
+  'tsun',
   'other',
 ];
 

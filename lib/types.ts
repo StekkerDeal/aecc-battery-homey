@@ -8,6 +8,7 @@ export type BrandId =
   | 'jet'
   | 'oscal'
   | 'fossibot'
+  | 'tsun'
   | 'other';
 
 export type Direction = 'charge' | 'discharge' | 'idle';

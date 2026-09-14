@@ -36,7 +36,8 @@
       "AccuMate",
       "JET",
       "Oscal",
-      "Fossibot"
+      "Fossibot",
+      "TSUN"
     ],
     "nl": [
       "stekkerbatterij",
@@ -638,6 +639,13 @@
                   "label": {
                     "en": "Fossibot",
                     "nl": "Fossibot"
+                  }
+                },
+                {
+                  "id": "tsun",
+                  "label": {
+                    "en": "TSUN",
+                    "nl": "TSUN"
                   }
                 },
                 {
