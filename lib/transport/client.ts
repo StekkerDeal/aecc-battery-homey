@@ -95,6 +95,7 @@ export class AeccClient {
 
   private serial = 0;
   private readTimeoutStreak = 0;
+  private stopped = false;
 
   constructor(options: AeccClientOptions) {
     this.readTimeoutMs = options.readTimeoutMs ?? DEFAULT_READ_TIMEOUT_MS;
@@ -121,8 +122,25 @@ export class AeccClient {
     this.connection.backoff.noteSuccess();
   }
 
+  // Teardown is the last word: this client never opens another socket after
+  // it returns. That matters because the device serves one TCP client at a
+  // time, so a socket opened after teardown is never revisited and holds that
+  // single slot until the device reboots.
+  //
+  // Both steps are needed. Closing straight away aborts an in-flight read now
+  // rather than leaving teardown to wait out its full read timeout, and the
+  // error it raises is swallowed by the stopped flag instead of reconnecting.
+  // Closing again through the queue catches the other race: a request already
+  // inside connection.connect() when the flag flipped completes after that
+  // first close and assigns its socket, and only a queued close runs late
+  // enough to see it.
+  //
+  // An AeccClient is single-use: after disconnect() every request resolves to
+  // null without dialling.
   async disconnect(): Promise<void> {
+    this.stopped = true;
     await this.connection.close();
+    await this.queue.run(() => this.connection.close());
   }
 
   async getEnergyParameters(): Promise<Record<string, unknown> | null> {
@@ -213,6 +231,9 @@ export class AeccClient {
     op: string,
     command: string
   ): Promise<Record<string, unknown> | null> {
+    // Queued behind a disconnect: dialling here would open a socket nothing
+    // ever closes again.
+    if (this.stopped) return null;
     try {
       const socket = await this.connection.connect();
       const response = await this.writeAndRead(socket, payload, timeoutMs);
@@ -220,6 +241,10 @@ export class AeccClient {
       this.readTimeoutStreak = 0;
       return response;
     } catch (err) {
+      // A teardown that lands mid-request is why this request failed, so it
+      // is neither retried nor logged, and above all not reconnected. This one
+      // check covers both handleReadTimeout and handleConnectionError.
+      if (this.stopped) return null;
       if (err instanceof ReadTimeoutError) {
         await this.handleReadTimeout(op, command);
         return null;

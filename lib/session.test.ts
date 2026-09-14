@@ -530,6 +530,38 @@ describe('AeccSession lifecycle and failure tolerance', () => {
     expect(socket.destroyed).toBe(true);
   });
 
+  // The device serves one TCP client at a time, so a socket opened after
+  // teardown is never revisited and holds that single slot forever. stop()
+  // tearing down mid-request must therefore be the last word: the request it
+  // interrupts rejects with a plain connection error, and that error path
+  // reconnects.
+  it('does not dial again when stop() lands during an in-flight poll', async () => {
+    const dialled: FakeDeviceSocket[] = [];
+    const socketFactory: SocketFactory = () => {
+      const socket = new FakeDeviceSocket();
+      // Accepts the connection and then answers nothing, so the first poll is
+      // still awaiting its response when stop() arrives.
+      socket.hook = req =>
+        req.Get === 'EnergyParameter' ? 'silent' : 'respond';
+      dialled.push(socket);
+      setTimeout(() => socket.connect(), 0);
+      return socket;
+    };
+    const { session } = makeSession({ socketFactory });
+
+    const starting = session.start();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(dialled.length).toBe(1);
+    expect(dialled[0]?.requests.length).toBe(1);
+
+    await session.stop();
+    await vi.runAllTimersAsync();
+    await starting;
+
+    expect(dialled.length).toBe(1);
+    expect(dialled[0]?.destroyed).toBe(true);
+  });
+
   it('emits unavailable exactly once after 5 consecutive failed polls, and available once on recovery', async () => {
     const { session, socket } = makeSession({
       pollIntervalMs: 2000,

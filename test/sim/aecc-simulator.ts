@@ -51,6 +51,10 @@ export class AeccSimulator {
   readonly port: number;
   readonly registers: Map<string, string>;
   readonly requests: RecordedRequest[] = [];
+  // Every connection attempt this device end saw, accepted or refused. A
+  // client that orphans a socket shows up here as an extra connection with no
+  // request behind it, which `requests` alone cannot reveal.
+  connections = 0;
 
   private readonly options: SimulatorOptions;
   private readonly server: net.Server;
@@ -153,6 +157,7 @@ export class AeccSimulator {
   }
 
   private onConnection(socket: net.Socket): void {
+    this.connections += 1;
     const refuse = this.options.refuseSecondConnection ?? true;
     if (refuse && this.activeSocket && !this.activeSocket.destroyed) {
       // Real behaviour of a second connect attempt is unverified; this

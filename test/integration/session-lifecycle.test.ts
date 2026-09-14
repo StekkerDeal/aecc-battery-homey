@@ -114,6 +114,48 @@ describe('AeccSession failure tolerance', () => {
   }, 30000);
 });
 
+// The unit test alongside this one asserts the client never dials twice. This
+// one asserts the same thing from the device's side, over real sockets, which
+// is where the damage actually lands: an orphaned connection owns the one
+// session slot and nothing on this app's side ever closes it again.
+describe('AeccSession teardown during an in-flight poll', () => {
+  it('leaves no second connection on the device after stop()', async () => {
+    sim = await AeccSimulator.start({
+      scenario: jetSingleUnit as unknown as Scenario,
+      port: 0,
+      // Long enough that the first poll is still awaiting its response when
+      // stop() arrives, short enough to leave no long-lived stray timer.
+      responseDelayMs: 800,
+    });
+    const simulator = sim;
+    session = new AeccSession({
+      host: '127.0.0.1',
+      port: sim.port,
+      brand: 'jet',
+      limits: { maxChargeW: 800, maxDischargeW: 800 },
+      scheduler: systemScheduler,
+      pollIntervalMs: 2000,
+      verifyIntervalMs: 0,
+      ...FAST_OPTS,
+      // Above the response delay, so the poll is cut short by stop() and not
+      // by its own read timeout, which is a different code path.
+      readTimeoutMs: 3000,
+    });
+
+    void session.start();
+    await waitFor(() => simulator.requests.length >= 1, 5000);
+    expect(simulator.connections).toBe(1);
+
+    await session.stop();
+    session = undefined;
+
+    // The backoff base is 30ms under FAST_OPTS, so a post-teardown reconnect
+    // would have landed long before this returns.
+    await new Promise(resolve => setTimeout(resolve, 500));
+    expect(simulator.connections).toBe(1);
+  }, 15000);
+});
+
 describe('AeccSession mid-poll socket reset', () => {
   it('recovers without ever going unavailable', async () => {
     sim = await AeccSimulator.start({
