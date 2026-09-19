@@ -232,7 +232,11 @@ export default class AeccPvDevice extends Homey.Device implements PvFollower {
       this.meter.sample(snapshot.lastGoodPollAtMs ?? Date.now(), watts);
     }
 
-    for (const update of mapPvSnapshot(snapshot, this.meter)) {
+    for (const update of mapPvSnapshot(
+      snapshot,
+      this.meter,
+      this.homey.clock.getTimezone()
+    )) {
       if (!this.hasCapability(update.id)) continue;
       await this.setCapabilityValue(update.id, update.value);
     }

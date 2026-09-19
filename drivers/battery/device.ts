@@ -484,7 +484,11 @@ export default class AeccDevice extends Homey.Device implements AeccFlowDevice {
       this.meter.sample(nowMs, snapshot.telemetry.measurePowerW);
     }
 
-    for (const update of mapSnapshot(snapshot, this.meter)) {
+    for (const update of mapSnapshot(
+      snapshot,
+      this.meter,
+      this.homey.clock.getTimezone()
+    )) {
       // Skip unknown ids rather than throwing: one unexpected capability
       // must not take down the whole snapshot path.
       if (!this.hasCapability(update.id)) continue;

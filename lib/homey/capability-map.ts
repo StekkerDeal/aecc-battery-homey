@@ -5,6 +5,7 @@ import type {
 } from '../protocol/energy-meter';
 import type { DerivedTelemetry } from '../protocol/telemetry';
 import type { DeviceIdentity } from '../types';
+import { formatLocalTimestamp } from './local-time';
 
 export interface CapabilityUpdate {
   id: string;
@@ -26,7 +27,8 @@ function roundKwh(n: number): number {
  */
 export function mapSnapshot(
   snapshot: SessionSnapshot,
-  meter: EnergyIntegrator
+  meter: EnergyIntegrator,
+  timeZone: string
 ): CapabilityUpdate[] {
   const telemetry = snapshot.telemetry;
 
@@ -40,10 +42,7 @@ export function mapSnapshot(
     { id: 'aecc_max_soc', value: snapshot.maxSoc },
     {
       id: 'aecc_last_update',
-      value:
-        snapshot.lastGoodPollAtMs === null
-          ? null
-          : new Date(snapshot.lastGoodPollAtMs).toISOString(),
+      value: formatLocalTimestamp(snapshot.lastGoodPollAtMs, timeZone),
     },
   ];
 
@@ -83,17 +82,15 @@ export function mapSnapshot(
  */
 export function mapPvSnapshot(
   snapshot: SessionSnapshot,
-  meter: ProductionIntegrator
+  meter: ProductionIntegrator,
+  timeZone: string
 ): CapabilityUpdate[] {
   return [
     { id: 'measure_power', value: snapshot.telemetry?.pvTotalPowerW ?? null },
     { id: 'meter_power', value: roundKwh(meter.generatedKwh) },
     {
       id: 'aecc_last_update',
-      value:
-        snapshot.lastGoodPollAtMs === null
-          ? null
-          : new Date(snapshot.lastGoodPollAtMs).toISOString(),
+      value: formatLocalTimestamp(snapshot.lastGoodPollAtMs, timeZone),
     },
   ];
 }

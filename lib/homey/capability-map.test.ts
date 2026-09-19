@@ -12,6 +12,8 @@ import type { DerivedTelemetry } from '../protocol/telemetry';
 import type { SessionSnapshot } from '../session';
 import type { DeviceIdentity } from '../types';
 
+const DEFAULT_TZ = 'Europe/Amsterdam';
+
 function makeTelemetry(
   overrides: Partial<DerivedTelemetry> = {}
 ): DerivedTelemetry {
@@ -65,7 +67,7 @@ describe('mapSnapshot', () => {
     });
     const snapshot = makeSnapshot();
 
-    const updates = mapSnapshot(snapshot, meter);
+    const updates = mapSnapshot(snapshot, meter, DEFAULT_TZ);
 
     expect(updateFor(updates, 'measure_power')).toEqual({
       id: 'measure_power',
@@ -97,7 +99,9 @@ describe('mapSnapshot', () => {
     });
     expect(updateFor(updates, 'aecc_last_update')).toEqual({
       id: 'aecc_last_update',
-      value: new Date(1_000).toISOString(),
+      // 1_000ms is 1970-01-01T00:00:01Z. The Netherlands was UTC+1 with no
+      // DST in January 1970, so Europe/Amsterdam reads one hour ahead.
+      value: '1970-01-01 01:00:01',
     });
   });
 
@@ -106,7 +110,7 @@ describe('mapSnapshot', () => {
       chargedKwh: 1.234_567_89,
       dischargedKwh: 0.000_049,
     });
-    const updates = mapSnapshot(makeSnapshot(), meter);
+    const updates = mapSnapshot(makeSnapshot(), meter, DEFAULT_TZ);
 
     expect(updateFor(updates, 'meter_power.charged')?.value).toBe(1.235);
     expect(updateFor(updates, 'meter_power.discharged')?.value).toBe(0);
@@ -116,7 +120,7 @@ describe('mapSnapshot', () => {
     const meter = new EnergyIntegrator();
     const snapshot = makeSnapshot({ telemetry: null });
 
-    const updates = mapSnapshot(snapshot, meter);
+    const updates = mapSnapshot(snapshot, meter, DEFAULT_TZ);
 
     expect(updateFor(updates, 'measure_power')?.value).toBeNull();
     expect(updateFor(updates, 'measure_battery')?.value).toBeNull();
@@ -129,9 +133,34 @@ describe('mapSnapshot', () => {
     const meter = new EnergyIntegrator();
     const snapshot = makeSnapshot({ lastGoodPollAtMs: null });
 
-    const updates = mapSnapshot(snapshot, meter);
+    const updates = mapSnapshot(snapshot, meter, DEFAULT_TZ);
 
     expect(updateFor(updates, 'aecc_last_update')?.value).toBeNull();
+  });
+
+  it('renders the same instant differently in two zones, proving the timezone argument is used', () => {
+    const meter = new EnergyIntegrator();
+    const snapshot = makeSnapshot({ lastGoodPollAtMs: 1_000 });
+
+    const amsterdam = mapSnapshot(snapshot, meter, 'Europe/Amsterdam');
+    const utc = mapSnapshot(snapshot, meter, 'UTC');
+
+    expect(updateFor(amsterdam, 'aecc_last_update')?.value).toBe(
+      '1970-01-01 01:00:01'
+    );
+    expect(updateFor(utc, 'aecc_last_update')?.value).toBe(
+      '1970-01-01 00:00:01'
+    );
+  });
+
+  it('reports null aecc_last_update, not the epoch, in every zone when there has never been a good poll', () => {
+    const meter = new EnergyIntegrator();
+    const snapshot = makeSnapshot({ lastGoodPollAtMs: null });
+
+    for (const timeZone of ['Europe/Amsterdam', 'UTC']) {
+      const updates = mapSnapshot(snapshot, meter, timeZone);
+      expect(updateFor(updates, 'aecc_last_update')?.value).toBeNull();
+    }
   });
 
   it('a Lunergy-shaped snapshot (no grid/pv/backup/rssi) yields no optional capability updates', () => {
@@ -147,7 +176,7 @@ describe('mapSnapshot', () => {
       identity: { serial: 'LUN1', firmware: '1.0' },
     });
 
-    const updates = mapSnapshot(snapshot, meter);
+    const updates = mapSnapshot(snapshot, meter, DEFAULT_TZ);
 
     for (const id of [
       'measure_power.grid',
@@ -175,7 +204,7 @@ describe('mapSnapshot', () => {
       identity: { serial: 'JET1', rssi: -55 },
     });
 
-    const updates = mapSnapshot(snapshot, meter);
+    const updates = mapSnapshot(snapshot, meter, DEFAULT_TZ);
 
     expect(updateFor(updates, 'measure_power.grid')).toEqual({
       id: 'measure_power.grid',
@@ -202,7 +231,7 @@ describe('mapSnapshot', () => {
     const meter = new EnergyIntegrator();
     const snapshot = makeSnapshot({ identity: { serial: 'X', rssi: 0 } });
 
-    const updates = mapSnapshot(snapshot, meter);
+    const updates = mapSnapshot(snapshot, meter, DEFAULT_TZ);
 
     expect(updateFor(updates, 'aecc_signal_strength')).toEqual({
       id: 'aecc_signal_strength',
@@ -214,13 +243,17 @@ describe('mapSnapshot', () => {
     const meter = new EnergyIntegrator();
     expect(
       updateFor(
-        mapSnapshot(makeSnapshot({ identity: null }), meter),
+        mapSnapshot(makeSnapshot({ identity: null }), meter, DEFAULT_TZ),
         'aecc_signal_strength'
       )
     ).toBeUndefined();
     expect(
       updateFor(
-        mapSnapshot(makeSnapshot({ identity: { serial: 'X' } }), meter),
+        mapSnapshot(
+          makeSnapshot({ identity: { serial: 'X' } }),
+          meter,
+          DEFAULT_TZ
+        ),
         'aecc_signal_strength'
       )
     ).toBeUndefined();
@@ -284,7 +317,7 @@ describe('mapPvSnapshot', () => {
       telemetry: makeTelemetry({ pvTotalPowerW: 758 }),
     });
 
-    const updates = mapPvSnapshot(snapshot, meter);
+    const updates = mapPvSnapshot(snapshot, meter, DEFAULT_TZ);
 
     expect(updateFor(updates, 'measure_power')).toEqual({
       id: 'measure_power',
@@ -296,7 +329,10 @@ describe('mapPvSnapshot', () => {
     });
     expect(updateFor(updates, 'aecc_last_update')).toEqual({
       id: 'aecc_last_update',
-      value: new Date(1_000).toISOString(),
+      // Same instant, same reasoning as mapSnapshot's equivalent assertion:
+      // 1970-01-01T00:00:01Z was 01:00:01 in Europe/Amsterdam (UTC+1, no
+      // DST yet in January 1970).
+      value: '1970-01-01 01:00:01',
     });
   });
 
@@ -304,7 +340,7 @@ describe('mapPvSnapshot', () => {
     const meter = new ProductionIntegrator({ generatedKwh: 3.2 });
     const snapshot = makeSnapshot({ telemetry: null });
 
-    const updates = mapPvSnapshot(snapshot, meter);
+    const updates = mapPvSnapshot(snapshot, meter, DEFAULT_TZ);
 
     // Null rather than 0 is the point: no reading is not the same as no sun.
     expect(updateFor(updates, 'measure_power')?.value).toBeNull();
@@ -320,7 +356,7 @@ describe('mapPvSnapshot', () => {
       telemetry: makeTelemetry({ pvTotalPowerW: null }),
     });
 
-    const updates = mapPvSnapshot(snapshot, meter);
+    const updates = mapPvSnapshot(snapshot, meter, DEFAULT_TZ);
 
     expect(updateFor(updates, 'measure_power')?.value).toBeNull();
   });
@@ -331,7 +367,7 @@ describe('mapPvSnapshot', () => {
       telemetry: makeTelemetry({ pvTotalPowerW: 0 }),
     });
 
-    const updates = mapPvSnapshot(snapshot, meter);
+    const updates = mapPvSnapshot(snapshot, meter, DEFAULT_TZ);
 
     expect(updateFor(updates, 'measure_power')?.value).toBe(0);
   });
@@ -340,14 +376,29 @@ describe('mapPvSnapshot', () => {
     const meter = new ProductionIntegrator();
     const snapshot = makeSnapshot({ lastGoodPollAtMs: null });
 
-    const updates = mapPvSnapshot(snapshot, meter);
+    const updates = mapPvSnapshot(snapshot, meter, DEFAULT_TZ);
 
     expect(updateFor(updates, 'aecc_last_update')?.value).toBeNull();
   });
 
+  it('renders the same instant differently in two zones, proving the timezone argument is used', () => {
+    const meter = new ProductionIntegrator();
+    const snapshot = makeSnapshot({ lastGoodPollAtMs: 1_000 });
+
+    const amsterdam = mapPvSnapshot(snapshot, meter, 'Europe/Amsterdam');
+    const utc = mapPvSnapshot(snapshot, meter, 'UTC');
+
+    expect(updateFor(amsterdam, 'aecc_last_update')?.value).toBe(
+      '1970-01-01 01:00:01'
+    );
+    expect(updateFor(utc, 'aecc_last_update')?.value).toBe(
+      '1970-01-01 00:00:01'
+    );
+  });
+
   it('rounds meter_power to Wh precision, matching mapSnapshot', () => {
     const meter = new ProductionIntegrator({ generatedKwh: 1.234_567_89 });
-    const updates = mapPvSnapshot(makeSnapshot(), meter);
+    const updates = mapPvSnapshot(makeSnapshot(), meter, DEFAULT_TZ);
 
     expect(updateFor(updates, 'meter_power')?.value).toBe(1.235);
   });
@@ -366,7 +417,7 @@ describe('mapPvSnapshot', () => {
       identity: { serial: 'JET1', rssi: -55 },
     });
 
-    const updates = mapPvSnapshot(snapshot, meter);
+    const updates = mapPvSnapshot(snapshot, meter, DEFAULT_TZ);
 
     expect(updates.map(u => u.id)).toEqual([
       'measure_power',
@@ -393,7 +444,7 @@ describe('mapPvSnapshot', () => {
     ];
 
     for (const snapshot of inputs) {
-      const ids = mapPvSnapshot(snapshot, meter).map(u => u.id);
+      const ids = mapPvSnapshot(snapshot, meter, DEFAULT_TZ).map(u => u.id);
       expect(ids.some(id => id.startsWith('measure_power.pv'))).toBe(false);
     }
   });
