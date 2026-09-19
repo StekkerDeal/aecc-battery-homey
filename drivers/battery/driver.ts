@@ -161,13 +161,13 @@ export default class AeccDriver extends Homey.Driver {
   ): string {
     if (reason === 'connect_failed') {
       return this.homey.__({
-        en: 'Could not connect to the battery. It accepts only one connection at a time, so check whether the vendor app (in local mode), a Home Assistant integration or another Homey is currently connected, then try again.',
-        nl: 'Kon geen verbinding maken met de batterij. Deze accepteert maar één verbinding tegelijk, controleer dus of de app van de fabrikant (in lokale modus), een Home Assistant-integratie of een andere Homey op dit moment verbonden is, en probeer het opnieuw.',
+        en: 'Could not connect to the battery. It accepts only one local connection at a time, so check whether a Home Assistant integration, another Homey or another local client is currently connected, then try again.',
+        nl: 'Kon geen verbinding maken met de batterij. Deze accepteert maar één lokale verbinding tegelijk, controleer dus of een Home Assistant-integratie, een andere Homey of een andere lokale client op dit moment verbonden is, en probeer het opnieuw.',
       });
     }
     return this.homey.__({
-      en: 'Connected to the battery, but it returned no valid data. It accepts only one connection at a time, so check whether the vendor app (in local mode), a Home Assistant integration or another Homey is currently connected, then try again.',
-      nl: 'Er is verbinding gemaakt met de batterij, maar deze gaf geen geldige gegevens terug. De batterij accepteert maar één verbinding tegelijk, controleer dus of de app van de fabrikant (in lokale modus), een Home Assistant-integratie of een andere Homey op dit moment verbonden is, en probeer het opnieuw.',
+      en: 'Connected to the battery, but it returned no valid data. It accepts only one local connection at a time, so check whether a Home Assistant integration, another Homey or another local client is currently connected, then try again.',
+      nl: 'Er is verbinding gemaakt met de batterij, maar deze gaf geen geldige gegevens terug. De batterij accepteert maar één lokale verbinding tegelijk, controleer dus of een Home Assistant-integratie, een andere Homey of een andere lokale client op dit moment verbonden is, en probeer het opnieuw.',
     });
   }
 

@@ -14,9 +14,16 @@ source is the canonical reference if anything here goes stale.
   connection. A second client connecting does not get an error, it starves:
   both clients see slow or missing responses because the device is only
   answering one of them. Never open more than one connection to the same
-  battery from this app, and be aware that the vendor app's local mode and
-  the Home Assistant integration are also single-session clients competing
-  for the same slot.
+  battery from this app, and be aware that the Home Assistant integration,
+  another Homey and any other client speaking this protocol are also
+  single-session clients competing for the same slot.
+- **The manufacturer's app is not a competitor for this slot.** It reaches
+  the battery over its own cloud or over Bluetooth, never over this TCP
+  connection. Its "local mode" is the Bluetooth path, not this one, so
+  telling a user to close it in order to free the TCP session is wrong. It
+  does still write the same control registers by those routes, so it
+  remains a second controller whose schedules overwrite anything written
+  here.
 - Reuse one persistent connection per battery. Reconnect with backoff after a
   drop rather than opening a new socket per request.
 

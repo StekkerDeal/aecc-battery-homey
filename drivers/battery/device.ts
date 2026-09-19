@@ -533,8 +533,8 @@ export default class AeccDevice extends Homey.Device implements AeccFlowDevice {
 
     await this.setUnavailable(
       this.homey.__({
-        en: `Cannot reach the battery at ${settings.host}:${settings.port}. The AECC protocol allows only one active connection per device: check that no other app or session (including the manufacturer app) is also connected to it.`,
-        nl: `Kan de batterij op ${settings.host}:${settings.port} niet bereiken. Het AECC-protocol staat maar één actieve verbinding per apparaat toe: controleer of er geen andere app of sessie (waaronder de app van de fabrikant) al mee verbonden is.`,
+        en: `Cannot reach the battery at ${settings.host}:${settings.port}. The AECC protocol allows only one active local connection per device: check that no Home Assistant integration, other Homey or other local client is connected to it.`,
+        nl: `Kan de batterij op ${settings.host}:${settings.port} niet bereiken. Het AECC-protocol staat maar één actieve lokale verbinding per apparaat toe: controleer of er geen Home Assistant-integratie, andere Homey of andere lokale client mee verbonden is.`,
       })
     );
   }

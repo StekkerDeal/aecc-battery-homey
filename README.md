@@ -58,7 +58,9 @@ For development or pre-release builds, see [`docs/development.md`](docs/developm
 4. Homey adds the device. Open its **Settings** to adjust the port (default 8080), the poll interval (default 5 seconds, 2 second floor), and the max charge/discharge power limits (default 800W each). Read [Power limits](#power-limits) before raising those: they limit what this app commands, not what the battery is capable of.
 5. **Only if solar panels are connected to that battery:** add a device again, pick **AECC PV input**, and choose the battery you just added. It has no settings of its own and follows that battery from then on.
 
-> **Before pairing a second client, read this:** the battery only serves **one TCP connection at a time**. This app, the vendor app's local mode, and the Home Assistant integration all compete for that single slot. Running more than one of them against the same battery at once is the single most common cause of "cannot connect", see Troubleshooting below.
+> **Before pairing a second client, read this:** the battery only serves **one TCP connection at a time**. This app, the Home Assistant integration, another Homey and any other client speaking this protocol all compete for that single slot. Running more than one of them against the same battery at once is the single most common cause of "cannot connect", see Troubleshooting below.
+>
+> **The manufacturer's app is not one of them.** It reaches the battery through its cloud or over Bluetooth, never over this connection, so closing it frees nothing and it does not have to be uninstalled. It is still not a second controller: schedules it sends and setpoints this app writes end up in the same registers and overwrite each other, so decide which one drives the battery.
 
 ## Capabilities
 
@@ -162,7 +164,7 @@ Purpose-built flow cards beyond these may be added in a later version; if you ne
 ## Troubleshooting
 
 **"Cannot connect" during pairing or afterwards**
-This is almost always the single-session limit: something else already holds the battery's one TCP slot. Close the vendor app's local connection and disable the Home Assistant integration (or vice versa) before pairing or troubleshooting this app, then try again.
+This is almost always the single-session limit: something else already holds the battery's one TCP slot. Disable the Home Assistant integration, another Homey, or whatever else speaks this protocol to the same battery before pairing or troubleshooting this app, then try again. Closing the manufacturer's app will not help, because it does not use this connection.
 
 **Nothing can connect any more, and restarting does not help**
 The battery only accepts a new local client for roughly the **first 30 seconds** after its datalogger restarts. Outside that window it simply stays silent, so a client whose retry backoff has grown past half a minute can never get back in on its own, and neither restarting Homey nor power-cycling the battery changes that. It also means a client that abandons a socket without closing it keeps the slot indefinitely, because nothing else can ever claim it.
