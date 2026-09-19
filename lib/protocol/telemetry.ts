@@ -174,6 +174,26 @@ export function systemValue(
   );
 }
 
+/**
+ * Total PV generation, from the summary block only.
+ *
+ * Deliberately not systemValue('pv_power'): that one falls back to summing
+ * the per-unit PvChargingPower, which is PV going into the battery and not
+ * PV coming off the panels. On an AFERIY capture every unit reported
+ * PvChargingPower 0 while the summary reported TotalPVPower 758, so the
+ * fallback would report a generating array as producing nothing whenever
+ * the panels feed the house instead of the battery.
+ *
+ * Absent means null, not zero: a model that does not report the field has
+ * no PV reading, while a real 0 is a genuine reading taken at night.
+ */
+export function summaryPvPowerW(frame: EnergyFrame): number | null {
+  const summary = frame.SSumInfoList;
+  if (!summary) return null;
+  const num = toFiniteNumber(summary.TotalPVPower);
+  return num === undefined ? null : round1(num);
+}
+
 // Best-effort wall-side power magnitude used by the SOC cleaner. Signed:
 // positive when charging, negative when discharging, null when neither
 // source has data.
@@ -217,6 +237,9 @@ export interface DerivedTelemetry {
   gridPowerW: number | null;
   gridExportW: number | null;
   pvPowerW: number | null;
+  // Summary-only PV total, the one the solar device reports and integrates.
+  // See summaryPvPowerW for why it is not pvPowerW.
+  pvTotalPowerW: number | null;
   pv1PowerW: number | null;
   pv2PowerW: number | null;
   backupPowerW: number | null;
@@ -258,6 +281,7 @@ export function derive(
     gridPowerW,
     gridExportW: gridPowerW === null ? null : Math.max(0, -gridPowerW),
     pvPowerW: systemValue(frame, 'pv_power') ?? null,
+    pvTotalPowerW: summaryPvPowerW(frame),
     pv1PowerW: systemValue(frame, 'pv1_power') ?? null,
     pv2PowerW: systemValue(frame, 'pv2_power') ?? null,
     backupPowerW: systemValue(frame, 'backup_power') ?? null,

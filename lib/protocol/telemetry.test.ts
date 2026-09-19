@@ -4,6 +4,7 @@ import {
   derive,
   frameUnits,
   parseEnergyFrame,
+  summaryPvPowerW,
   systemValue,
   unitKey,
   wallPowerSignalW,
@@ -199,6 +200,61 @@ describe('wallPowerSignalW', () => {
   });
 });
 
+describe('summaryPvPowerW', () => {
+  it('reads TotalPVPower from the summary block', () => {
+    expect(summaryPvPowerW({ SSumInfoList: { TotalPVPower: 758 } })).toBe(758);
+  });
+
+  // The entire point of this function: PvChargingPower is PV going into the
+  // battery, not PV coming off the panels. On the real AFERIY capture behind
+  // this file, TotalPVPower read 758 while every unit's PvChargingPower read
+  // 0, so falling back to the per-unit field would report a generating array
+  // as producing nothing whenever the panels feed the house instead of the
+  // battery. This frame proves the fallback is never taken, even when it
+  // would return a plausible-looking non-zero number.
+  it('returns null when TotalPVPower is absent, even with a non-zero PvChargingPower fallback available', () => {
+    const frame: EnergyFrame = {
+      Storage_list: [{ PvChargingPower: 1200 }],
+      SSumInfoList: { AverageBatteryAverageSOC: 40 },
+    };
+    expect(summaryPvPowerW(frame)).toBeNull();
+  });
+
+  it('returns null when there is no SSumInfoList at all', () => {
+    expect(summaryPvPowerW({})).toBeNull();
+    expect(
+      summaryPvPowerW({ Storage_list: [{ PvChargingPower: 500 }] })
+    ).toBeNull();
+  });
+
+  it('returns 0 for a real zero reading instead of null', () => {
+    expect(summaryPvPowerW({ SSumInfoList: { TotalPVPower: 0 } })).toBe(0);
+  });
+
+  it('parses a numeric string', () => {
+    expect(summaryPvPowerW({ SSumInfoList: { TotalPVPower: '758' } })).toBe(
+      758
+    );
+  });
+
+  it('returns null for a non-numeric string or an explicit null', () => {
+    expect(
+      summaryPvPowerW({ SSumInfoList: { TotalPVPower: 'nope' } })
+    ).toBeNull();
+    expect(
+      summaryPvPowerW({
+        SSumInfoList: { TotalPVPower: null },
+      } as unknown as EnergyFrame)
+    ).toBeNull();
+  });
+
+  it('rounds to one decimal like the rest of the file', () => {
+    expect(summaryPvPowerW({ SSumInfoList: { TotalPVPower: 758.44 } })).toBe(
+      758.4
+    );
+  });
+});
+
 describe('derive', () => {
   it('computes measurePowerW as max(charge, acCharge) - discharge, positive = charging', () => {
     const frame: EnergyFrame = {
@@ -367,5 +423,32 @@ describe('derive', () => {
     expect(result.pv1PowerW).toBe(100);
     expect(result.pv2PowerW).toBe(200);
     expect(result.backupPowerW).toBe(500);
+  });
+
+  it('sets pvTotalPowerW from summaryPvPowerW for the same frame', () => {
+    const summaryOnly: EnergyFrame = { SSumInfoList: { TotalPVPower: 758 } };
+    expect(derive(summaryOnly, null).pvTotalPowerW).toBe(
+      summaryPvPowerW(summaryOnly)
+    );
+
+    const noSummaryAtAll: EnergyFrame = {};
+    expect(derive(noSummaryAtAll, null).pvTotalPowerW).toBe(
+      summaryPvPowerW(noSummaryAtAll)
+    );
+  });
+
+  // Regression guard: pvPowerW keeps falling back to the PvChargingPower sum
+  // exactly as before, and that fallback must never leak into pvTotalPowerW.
+  // The two fields are deliberately different values on the same frame.
+  it('keeps pvPowerW on its old PvChargingPower fallback while pvTotalPowerW stays null', () => {
+    const pvIntoBatteryOnly: EnergyFrame = {
+      Storage_list: [{ PvChargingPower: 1200 }],
+      SSumInfoList: { AverageBatteryAverageSOC: 40 },
+    };
+    const result = derive(pvIntoBatteryOnly, null);
+    expect(result.pvTotalPowerW).toBe(summaryPvPowerW(pvIntoBatteryOnly));
+    expect(result.pvTotalPowerW).toBeNull();
+    expect(result.pvPowerW).toBe(120);
+    expect(result.pvPowerW).not.toBe(result.pvTotalPowerW);
   });
 });

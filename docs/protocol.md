@@ -170,6 +170,46 @@ the inconsistency does not follow a simple per-field or per-device rule:
 Do not assume a field's scale from its neighbours or from another field with
 a similar name; verify against a live device before trusting a new field.
 
+## PV fields: only the summary total is trustworthy
+
+**Use `SSumInfoList.TotalPVPower` for generation, and nothing else.** The
+per-unit `PvChargingPower` is PV going _into the battery_, not PV coming off
+the panels. An AFERIY PS240 capture recorded `TotalPVPower: 758` while both
+units reported `PvChargingPower: 0`, so anything falling back to the
+charging-side field reports a generating array as producing nothing whenever
+the panels feed the house instead of the battery.
+
+**`TotalPVPower` is in watts, confirmed against live generation.** An Oscal
+Power Storage 2000 owner with two 500W bifacial panels reported `458` under
+overcast skies, consistent with the array and the conditions, and an earlier
+screenshot from the same device showed `352` alongside `TotalPVChargePower:
+265` ([aecc-battery-local#20](https://github.com/StekkerDeal/aecc-battery-local/issues/20)).
+This is the one PV field with a real reading behind it.
+
+**`Pv1Power` to `Pv4Power` appear not to be populated by this firmware
+family.** They read 0 in every capture across six brands, including the
+458W one above and a device advertising `PvStringCount: 4`. The same owner
+confirmed the vendor app shows no per-string values anywhere and the
+manufacturer's own Home Assistant integration exposes none either. Their
+scale therefore remains unverified, since no non-zero reading exists: the
+note above grouping `Pv1Power` and `Pv2Power` with the watt-scale fields
+rests on inference, not measurement. `Pv3Power` and `Pv4Power` are not
+mapped by either integration.
+
+**`PvStringCount` is not a reliable presence signal.** It contradicts itself
+across captures: an AEG Solarcube stack reports `4` on the master and `0` on
+the slave (same model, same firmware), a JET with no panels reports `0` and
+declares four string fields anyway, and the AFERIY reports `0` on both units
+while its summary reports 758W. It cannot currently be used to decide
+whether a battery has PV hardware, nor how many strings it has.
+
+The practical consequence: a battery with no panels and a battery at night
+are indistinguishable over this protocol. The Homey app therefore asks the
+owner to confirm that panels exist rather than detecting it, and exposes the
+summary total only. Per-string capabilities become worth adding if, and only
+if, a firmware update starts populating those fields, which a fresh capture
+would show.
+
 ## Security: DeviceManagement exposes credentials
 
 **The `DeviceManagement` accessor is not safe to read broadly.** An

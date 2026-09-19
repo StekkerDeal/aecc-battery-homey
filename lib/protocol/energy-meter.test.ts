@@ -3,8 +3,11 @@ import {
   EnergyIntegrator,
   METER_PERSIST_DELTA_KWH,
   METER_PERSIST_INTERVAL_MS,
+  ProductionIntegrator,
   shouldPersistMeter,
+  shouldPersistProductionMeter,
   type ShouldPersistMeterInput,
+  type ShouldPersistProductionMeterInput,
 } from './energy-meter';
 
 describe('EnergyIntegrator', () => {
@@ -194,5 +197,148 @@ describe('shouldPersistMeter', () => {
         baseline.lastPersistedChargedKwh + METER_PERSIST_DELTA_KWH - 0.0001,
     };
     expect(shouldPersistMeter(input)).toBe(false);
+  });
+});
+
+describe('ProductionIntegrator', () => {
+  it('does nothing on the first sample (no previous timestamp)', () => {
+    const meter = new ProductionIntegrator();
+    const integrated = meter.sample(0, 1000);
+    expect(integrated).toBe(false);
+    expect(meter.generatedKwh).toBe(0);
+  });
+
+  it('integrates 1000 W held for one hour into exactly 1 kWh', () => {
+    const meter = new ProductionIntegrator(undefined, { maxGapMs: 3_600_000 });
+    meter.sample(0, 1000);
+    const integrated = meter.sample(3_600_000, 1000);
+    expect(integrated).toBe(true);
+    expect(meter.generatedKwh).toBeCloseTo(1, 6);
+  });
+
+  it('a negative power contributes 0 but still advances the timestamp', () => {
+    const meter = new ProductionIntegrator();
+    meter.sample(0, 500); // establish the baseline timestamp
+    const negativeResult = meter.sample(10_000, -300);
+    expect(negativeResult).toBe(true);
+    expect(meter.generatedKwh).toBe(0);
+
+    // This interval runs from the negative sample's timestamp, not from 0,
+    // so it must integrate over 10s, not 20s.
+    const nextResult = meter.sample(20_000, 1000);
+    expect(nextResult).toBe(true);
+    expect(meter.generatedKwh).toBeCloseTo((1000 * 10_000) / 3.6e9, 9);
+  });
+
+  it('a gap longer than the default maxGapMs is skipped but still advances the timestamp', () => {
+    const meter = new ProductionIntegrator();
+    meter.sample(0, 1000);
+    const gapResult = meter.sample(61_000, 1000);
+    expect(gapResult).toBe(false);
+    expect(meter.generatedKwh).toBe(0);
+
+    // The next interval runs from the skipped sample's timestamp, so it
+    // integrates cleanly over its own 10s gap.
+    const nextResult = meter.sample(71_000, 1000);
+    expect(nextResult).toBe(true);
+    expect(meter.generatedKwh).toBeCloseTo((1000 * 10_000) / 3.6e9, 9);
+  });
+
+  it('rejects a non-finite power sample (NaN or Infinity)', () => {
+    const meter = new ProductionIntegrator();
+    meter.sample(0, 1000);
+    expect(meter.sample(1000, Number.NaN)).toBe(false);
+    expect(meter.generatedKwh).toBe(0);
+    expect(meter.sample(2000, Number.POSITIVE_INFINITY)).toBe(false);
+    expect(meter.generatedKwh).toBe(0);
+  });
+
+  it('skips a non-positive delta (same or earlier timestamp)', () => {
+    const meter = new ProductionIntegrator();
+    meter.sample(1000, 500);
+    expect(meter.sample(1000, 500)).toBe(false);
+    expect(meter.sample(500, 500)).toBe(false);
+  });
+
+  it('respects a custom maxGapMs', () => {
+    const meter = new ProductionIntegrator(undefined, { maxGapMs: 5000 });
+    meter.sample(0, 1000);
+    const integrated = meter.sample(5001, 1000);
+    expect(integrated).toBe(false);
+  });
+
+  it('restores generatedKwh from constructor state', () => {
+    const meter = new ProductionIntegrator({ generatedKwh: 12.5 });
+    expect(meter.generatedKwh).toBe(12.5);
+  });
+
+  it('serializes and restores the counter, serialising only generatedKwh', () => {
+    const meter = new ProductionIntegrator();
+    meter.sample(0, 1000);
+    meter.sample(30_000, 1000); // 30s gap, within the default 60s max
+    const state = meter.serialize();
+    expect(state.generatedKwh).toBeGreaterThan(0);
+    expect(Object.keys(state)).toEqual(['generatedKwh']);
+
+    const restored = new ProductionIntegrator(state);
+    expect(restored.generatedKwh).toBe(state.generatedKwh);
+  });
+
+  it('reset zeroes the counter and clears the in-memory timestamp', () => {
+    const meter = new ProductionIntegrator();
+    meter.sample(0, 1000);
+    meter.sample(3_600_000, 1000);
+    meter.reset();
+    expect(meter.generatedKwh).toBe(0);
+    expect(meter.sample(3_600_001, 1000)).toBe(false);
+    expect(meter.generatedKwh).toBe(0);
+  });
+});
+
+describe('shouldPersistProductionMeter', () => {
+  const baseline: ShouldPersistProductionMeterInput = {
+    currentGeneratedKwh: 1,
+    lastPersistedGeneratedKwh: 1,
+    nowMs: 0,
+    lastPersistedAtMs: 0,
+  };
+
+  it('does not persist below both the kWh delta and the time interval', () => {
+    const input: ShouldPersistProductionMeterInput = {
+      ...baseline,
+      currentGeneratedKwh: 1 + METER_PERSIST_DELTA_KWH / 2,
+      nowMs: METER_PERSIST_INTERVAL_MS - 1,
+    };
+    expect(shouldPersistProductionMeter(input)).toBe(false);
+  });
+
+  it('persists once the generated kWh delta reaches the threshold exactly', () => {
+    // A zero-valued baseline keeps the delta exactly at the threshold;
+    // adding METER_PERSIST_DELTA_KWH onto a non-zero baseline and
+    // subtracting it back out is not guaranteed to land on the same
+    // floating-point value.
+    const input: ShouldPersistProductionMeterInput = {
+      ...baseline,
+      currentGeneratedKwh: METER_PERSIST_DELTA_KWH,
+      lastPersistedGeneratedKwh: 0,
+    };
+    expect(shouldPersistProductionMeter(input)).toBe(true);
+  });
+
+  it('persists once the generated kWh delta exceeds the threshold', () => {
+    const input: ShouldPersistProductionMeterInput = {
+      ...baseline,
+      currentGeneratedKwh:
+        baseline.lastPersistedGeneratedKwh + METER_PERSIST_DELTA_KWH * 2,
+    };
+    expect(shouldPersistProductionMeter(input)).toBe(true);
+  });
+
+  it('persists once the time interval since the last flush reaches exactly, even with no movement', () => {
+    const input: ShouldPersistProductionMeterInput = {
+      ...baseline,
+      nowMs: METER_PERSIST_INTERVAL_MS,
+    };
+    expect(shouldPersistProductionMeter(input)).toBe(true);
   });
 });

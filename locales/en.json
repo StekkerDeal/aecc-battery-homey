@@ -29,6 +29,15 @@
       "power_hint": "This limits what the app commands, not the battery itself, and does not apply in Self-consumption mode. Discharging above 800W also needs On Grid Output raised once in the vendor app.",
       "next": "Continue",
       "failed": "Could not save the brand."
+    },
+    "pv": {
+      "title": "Choose the battery",
+      "intro": "This device reports the PV input of a battery you already added. Only add it if solar panels are connected to that battery.",
+      "battery": "Battery",
+      "none": "Add your battery first. This device follows one that is already paired.",
+      "next": "Continue",
+      "battery_required": "Pick a battery.",
+      "failed": "Could not add the PV device."
     }
   }
 }

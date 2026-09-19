@@ -1,0 +1,76 @@
+<header class="homey-header">
+  <h1 class="homey-title" data-i18n="pair.pv.title"></h1>
+  <p class="homey-subtitle" data-i18n="pair.pv.intro"></p>
+</header>
+
+<fieldset class="homey-form-fieldset">
+  <div class="homey-form-group" id="battery-group">
+    <label
+      class="homey-form-label"
+      for="battery"
+      data-i18n="pair.pv.battery"
+    ></label>
+    <select class="homey-form-select" id="battery"></select>
+  </div>
+  <p class="homey-subtitle" id="none" data-i18n="pair.pv.none" hidden></p>
+</fieldset>
+
+<button
+  id="btn-next"
+  class="homey-button-primary-full is-disabled"
+  data-i18n="pair.pv.next"
+  disabled
+></button>
+
+<script type="application/javascript">
+  const group = document.getElementById('battery-group');
+  const select = document.getElementById('battery');
+  const none = document.getElementById('none');
+  const next = document.getElementById('btn-next');
+
+  (async () => {
+    const batteries = await Homey.emit('list_batteries');
+
+    if (!Array.isArray(batteries) || batteries.length === 0) {
+      // No battery paired yet: nothing to link to, so the list is replaced
+      // by the explanatory text and continue stays disabled.
+      group.hidden = true;
+      none.hidden = false;
+      return;
+    }
+
+    for (const battery of batteries) {
+      const option = document.createElement('option');
+      option.value = battery.id;
+      option.textContent = battery.name;
+      select.appendChild(option);
+    }
+
+    next.disabled = false;
+    next.classList.remove('is-disabled');
+  })();
+
+  next.addEventListener('click', async () => {
+    const batteryId = select.value;
+    if (!batteryId) {
+      Homey.alert(Homey.__('pair.pv.battery_required'));
+      return;
+    }
+
+    next.classList.add('is-loading', 'is-disabled');
+
+    try {
+      // The driver validates the choice and returns the device to create.
+      // This view creates it itself rather than handing off to the
+      // add_devices template: that template sources its list from the
+      // list_devices view's own selection, which a driver without a device
+      // list never populates, so the flow ended silently with nothing added.
+      const device = await Homey.emit('battery_selected', { id: batteryId });
+      await Homey.createDevice(device);
+      Homey.done();
+    } catch (error) {
+      next.classList.remove('is-loading', 'is-disabled');
+      Homey.alert((error && error.message) || Homey.__('pair.pv.failed'));
+    }
+  });
+</script>

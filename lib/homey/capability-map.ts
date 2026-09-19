@@ -1,5 +1,8 @@
 import type { SessionSnapshot } from '../session';
-import type { EnergyIntegrator } from '../protocol/energy-meter';
+import type {
+  EnergyIntegrator,
+  ProductionIntegrator,
+} from '../protocol/energy-meter';
 import type { DerivedTelemetry } from '../protocol/telemetry';
 import type { DeviceIdentity } from '../types';
 
@@ -73,6 +76,32 @@ export function mapSnapshot(
   }
 
   return updates;
+}
+
+/**
+ * Maps one session snapshot plus the PV meter to the solar device's
+ * capabilities. Three values, always present, no runtime sub-capabilities:
+ * per-string readings are deliberately absent until a capture from a
+ * generating system settles what the PvXPower fields actually mean.
+ *
+ * measure_power is null rather than 0 when there is no reading, so a model
+ * that does not report PV at all reads as unknown instead of as darkness.
+ */
+export function mapPvSnapshot(
+  snapshot: SessionSnapshot,
+  meter: ProductionIntegrator
+): CapabilityUpdate[] {
+  return [
+    { id: 'measure_power', value: snapshot.telemetry?.pvTotalPowerW ?? null },
+    { id: 'meter_power', value: roundKwh(meter.generatedKwh) },
+    {
+      id: 'aecc_last_update',
+      value:
+        snapshot.lastGoodPollAtMs === null
+          ? null
+          : new Date(snapshot.lastGoodPollAtMs).toISOString(),
+    },
+  ];
 }
 
 /**

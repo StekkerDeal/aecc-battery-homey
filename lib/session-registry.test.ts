@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { SessionRegistry } from './session-registry';
+import { registryKeyFor, SessionRegistry } from './session-registry';
 import type { AeccSession } from './session';
 
 function fakeSession(): AeccSession {
@@ -7,6 +7,36 @@ function fakeSession(): AeccSession {
     stop: vi.fn().mockResolvedValue(undefined),
   } as unknown as AeccSession;
 }
+
+describe('registryKeyFor', () => {
+  it('produces exactly host:port', () => {
+    expect(registryKeyFor('192.168.1.40', 8080)).toBe('192.168.1.40:8080');
+  });
+
+  it('gives two different keys for the same host on two different ports', () => {
+    const first = registryKeyFor('192.168.1.40', 8080);
+    const second = registryKeyFor('192.168.1.40', 8081);
+    expect(first).not.toBe(second);
+  });
+
+  it('passes a hostname through untouched: not lowercased, not trimmed, not rewritten', () => {
+    expect(registryKeyFor('  MyHost.Local  ', 502)).toBe(
+      '  MyHost.Local  :502'
+    );
+  });
+
+  // This is the single-TCP-session invariant expressed as a test: two
+  // drivers deriving different keys for the same battery would dial it
+  // twice. test/integration/session-registry.test.ts builds its key by hand
+  // as `127.0.0.1:${port}`; that literal must agree with registryKeyFor, or
+  // the integration test would be exercising a key the real registry never
+  // uses.
+  it('agrees with the key the integration test builds by hand', () => {
+    const port = 12345;
+    const handBuilt = `127.0.0.1:${port}`;
+    expect(registryKeyFor('127.0.0.1', port)).toBe(handBuilt);
+  });
+});
 
 describe('SessionRegistry.acquire', () => {
   it('creates a new session via the factory on first acquire', () => {

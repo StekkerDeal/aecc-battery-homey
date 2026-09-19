@@ -763,6 +763,64 @@
           ]
         }
       ]
+    },
+    {
+      "name": {
+        "en": "AECC PV input",
+        "nl": "AECC PV-ingang"
+      },
+      "class": "solarpanel",
+      "platforms": [
+        "local"
+      ],
+      "connectivity": [
+        "lan"
+      ],
+      "images": {
+        "small": "/drivers/pv/assets/images/small.png",
+        "large": "/drivers/pv/assets/images/large.png",
+        "xlarge": "/drivers/pv/assets/images/xlarge.png"
+      },
+      "capabilities": [
+        "measure_power",
+        "meter_power",
+        "aecc_last_update",
+        "button.reset_meters"
+      ],
+      "capabilitiesOptions": {
+        "measure_power": {
+          "title": {
+            "en": "PV power",
+            "nl": "PV-vermogen"
+          }
+        },
+        "meter_power": {
+          "title": {
+            "en": "Generated energy",
+            "nl": "Opgewekte energie"
+          }
+        },
+        "button.reset_meters": {
+          "maintenanceAction": true,
+          "title": {
+            "en": "Reset meter",
+            "nl": "Meter resetten"
+          },
+          "desc": {
+            "en": "Resets the generated energy meter to zero. This breaks the continuity of this device's history in Homey Energy.",
+            "nl": "Zet de meter voor opgewekte energie terug naar nul. Dit onderbreekt de continuïteit van de geschiedenis van dit apparaat in Homey Energie."
+          }
+        }
+      },
+      "energy": {
+        "meterPowerExportedCapability": "meter_power"
+      },
+      "pair": [
+        {
+          "id": "choose_battery"
+        }
+      ],
+      "id": "pv"
     }
   ],
   "capabilities": {

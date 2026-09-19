@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { mapSnapshot, optionalCapabilities } from './capability-map';
-import { EnergyIntegrator } from '../protocol/energy-meter';
+import {
+  mapPvSnapshot,
+  mapSnapshot,
+  optionalCapabilities,
+} from './capability-map';
+import {
+  EnergyIntegrator,
+  ProductionIntegrator,
+} from '../protocol/energy-meter';
 import type { DerivedTelemetry } from '../protocol/telemetry';
 import type { SessionSnapshot } from '../session';
 import type { DeviceIdentity } from '../types';
@@ -15,6 +22,7 @@ function makeTelemetry(
     gridPowerW: null,
     gridExportW: null,
     pvPowerW: null,
+    pvTotalPowerW: null,
     pv1PowerW: null,
     pv2PowerW: null,
     backupPowerW: null,
@@ -159,6 +167,7 @@ describe('mapSnapshot', () => {
       telemetry: makeTelemetry({
         gridPowerW: -120,
         pvPowerW: 1800,
+        pvTotalPowerW: 1800,
         pv1PowerW: 900,
         pv2PowerW: 900,
         backupPowerW: 0,
@@ -237,6 +246,7 @@ describe('optionalCapabilities', () => {
       makeTelemetry({
         gridPowerW: 100,
         pvPowerW: 1800,
+        pvTotalPowerW: 1800,
         pv1PowerW: 900,
         pv2PowerW: 900,
         backupPowerW: 0,
@@ -273,5 +283,127 @@ describe('optionalCapabilities', () => {
       noIdentity
     );
     expect(ids).toEqual(['measure_power.pv1', 'measure_power.pv2']);
+  });
+});
+
+describe('mapPvSnapshot', () => {
+  it('maps the mandatory capabilities from a fully populated snapshot', () => {
+    const meter = new ProductionIntegrator({ generatedKwh: 2.5 });
+    const snapshot = makeSnapshot({
+      telemetry: makeTelemetry({ pvTotalPowerW: 758 }),
+    });
+
+    const updates = mapPvSnapshot(snapshot, meter);
+
+    expect(updateFor(updates, 'measure_power')).toEqual({
+      id: 'measure_power',
+      value: 758,
+    });
+    expect(updateFor(updates, 'meter_power')).toEqual({
+      id: 'meter_power',
+      value: 2.5,
+    });
+    expect(updateFor(updates, 'aecc_last_update')).toEqual({
+      id: 'aecc_last_update',
+      value: new Date(1_000).toISOString(),
+    });
+  });
+
+  it('reports measure_power null when telemetry is absent, but still emits meter_power', () => {
+    const meter = new ProductionIntegrator({ generatedKwh: 3.2 });
+    const snapshot = makeSnapshot({ telemetry: null });
+
+    const updates = mapPvSnapshot(snapshot, meter);
+
+    // Null rather than 0 is the point: no reading is not the same as no sun.
+    expect(updateFor(updates, 'measure_power')?.value).toBeNull();
+    expect(updateFor(updates, 'meter_power')).toEqual({
+      id: 'meter_power',
+      value: 3.2,
+    });
+  });
+
+  it('reports measure_power null when live telemetry has no PV total', () => {
+    const meter = new ProductionIntegrator();
+    const snapshot = makeSnapshot({
+      telemetry: makeTelemetry({ pvTotalPowerW: null }),
+    });
+
+    const updates = mapPvSnapshot(snapshot, meter);
+
+    expect(updateFor(updates, 'measure_power')?.value).toBeNull();
+  });
+
+  it('reports a real 0 reading as 0, not null', () => {
+    const meter = new ProductionIntegrator();
+    const snapshot = makeSnapshot({
+      telemetry: makeTelemetry({ pvTotalPowerW: 0 }),
+    });
+
+    const updates = mapPvSnapshot(snapshot, meter);
+
+    expect(updateFor(updates, 'measure_power')?.value).toBe(0);
+  });
+
+  it('reports null aecc_last_update when there has never been a good poll', () => {
+    const meter = new ProductionIntegrator();
+    const snapshot = makeSnapshot({ lastGoodPollAtMs: null });
+
+    const updates = mapPvSnapshot(snapshot, meter);
+
+    expect(updateFor(updates, 'aecc_last_update')?.value).toBeNull();
+  });
+
+  it('rounds meter_power to Wh precision, matching mapSnapshot', () => {
+    const meter = new ProductionIntegrator({ generatedKwh: 1.234_567_89 });
+    const updates = mapPvSnapshot(makeSnapshot(), meter);
+
+    expect(updateFor(updates, 'meter_power')?.value).toBe(1.235);
+  });
+
+  it('returns exactly the three PV capability ids, no battery or per-string PV leakage', () => {
+    const meter = new ProductionIntegrator({ generatedKwh: 1 });
+    const snapshot = makeSnapshot({
+      telemetry: makeTelemetry({
+        pvTotalPowerW: 758,
+        pvPowerW: 1800,
+        pv1PowerW: 900,
+        pv2PowerW: 900,
+        gridPowerW: -120,
+        backupPowerW: 0,
+      }),
+      identity: { serial: 'JET1', rssi: -55 },
+    });
+
+    const updates = mapPvSnapshot(snapshot, meter);
+
+    expect(updates.map(u => u.id)).toEqual([
+      'measure_power',
+      'meter_power',
+      'aecc_last_update',
+    ]);
+  });
+
+  it('never emits a measure_power.pv* id under any input', () => {
+    const meter = new ProductionIntegrator();
+    const inputs: SessionSnapshot[] = [
+      makeSnapshot(),
+      makeSnapshot({ telemetry: null }),
+      makeSnapshot({ telemetry: makeTelemetry({ pvTotalPowerW: null }) }),
+      makeSnapshot({ telemetry: makeTelemetry({ pvTotalPowerW: 0 }) }),
+      makeSnapshot({
+        telemetry: makeTelemetry({
+          pvTotalPowerW: 758,
+          pvPowerW: 1800,
+          pv1PowerW: 900,
+          pv2PowerW: 900,
+        }),
+      }),
+    ];
+
+    for (const snapshot of inputs) {
+      const ids = mapPvSnapshot(snapshot, meter).map(u => u.id);
+      expect(ids.some(id => id.startsWith('measure_power.pv'))).toBe(false);
+    }
   });
 });

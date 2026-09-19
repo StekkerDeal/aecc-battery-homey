@@ -29,6 +29,15 @@
       "power_hint": "Dit begrenst wat de app stuurt, niet de batterij zelf, en geldt niet in zelfconsumptiemodus. Ontladen boven 800W vereist ook dat On Grid Output één keer wordt verhoogd in de app van de fabrikant.",
       "next": "Doorgaan",
       "failed": "Kon het merk niet opslaan."
+    },
+    "pv": {
+      "title": "Kies de batterij",
+      "intro": "Dit apparaat toont de PV-ingang van een batterij die je al hebt toegevoegd. Voeg het alleen toe als er zonnepanelen op die batterij zijn aangesloten.",
+      "battery": "Batterij",
+      "none": "Voeg eerst je batterij toe. Dit apparaat volgt een batterij die al gekoppeld is.",
+      "next": "Doorgaan",
+      "battery_required": "Kies een batterij.",
+      "failed": "Kon het PV-apparaat niet toevoegen."
     }
   }
 }

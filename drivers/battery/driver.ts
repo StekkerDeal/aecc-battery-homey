@@ -1,6 +1,5 @@
 import Homey from 'homey';
 import { AeccClient } from '../../lib/transport/client';
-import { SessionRegistry } from '../../lib/session-registry';
 import {
   applyBrandSettings,
   buildManualPairDevice,
@@ -22,8 +21,6 @@ import {
 import type AeccDevice from './device';
 
 export default class AeccDriver extends Homey.Driver {
-  public readonly sessions = new SessionRegistry();
-
   async onInit(): Promise<void> {
     this.log('AECC battery driver initialised');
   }

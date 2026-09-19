@@ -6,7 +6,9 @@ import {
   type SessionEvent,
   type SessionSnapshot,
 } from '../../lib/session';
-import type { SessionRegistry } from '../../lib/session-registry';
+import { sessionHost } from '../../lib/homey/session-host';
+import { sessionOptionsFrom } from '../../lib/homey/session-factory';
+import { SessionLease } from '../../lib/homey/session-lease';
 import {
   EnergyIntegrator,
   shouldPersistMeter,
@@ -30,12 +32,7 @@ import {
   type RawSettings,
 } from '../../lib/homey/device-settings';
 import { planEmsCommand } from '../../lib/homey/ems-command';
-
-// The driver package owns driver.ts; this is the shared shape it exposes,
-// see the WP5 contract: one SessionRegistry per driver, keyed by host:port.
-interface AeccDriver extends Homey.Driver {
-  readonly sessions: SessionRegistry;
-}
+import { followersOf } from '../../lib/homey/pv-link';
 
 interface OnSettingsEvent {
   oldSettings: RawSettings;
@@ -55,18 +52,11 @@ const OPTIONAL_CAPABILITY_IDS: readonly string[] = [
   'aecc_signal_strength',
 ];
 
-function registryKeyFor(host: string, port: number): string {
-  return `${host}:${port}`;
-}
-
 export default class AeccDevice extends Homey.Device implements AeccFlowDevice {
-  private session!: AeccSession;
+  private lease!: SessionLease;
   private meter!: EnergyIntegrator;
-  private registryKey = '';
-  private unsubscribeSession: (() => void) | null = null;
 
   private currentOptionalCapabilities = new Set<string>();
-  private pendingStartHandle: NodeJS.Timeout | null = null;
 
   private lastPersistedChargedKwh = 0;
   private lastPersistedDischargedKwh = 0;
@@ -80,15 +70,15 @@ export default class AeccDevice extends Homey.Device implements AeccFlowDevice {
 
   async onInit(): Promise<void> {
     const settings = settingsFrom(this.getSettings() as RawSettings);
-    this.registryKey = registryKeyFor(settings.host, settings.port);
-
-    const driver = this.driver as AeccDriver;
-    let created = false;
-    const { session, index } = driver.sessions.acquire(this.registryKey, () => {
-      created = true;
-      return this.createSession(settings);
+    this.lease = new SessionLease({
+      registry: sessionHost(this.homey.app).sessions,
+      scheduler: this.scheduler(),
+      createSession: s => this.createSession(s),
+      onEvent: event => {
+        void this.handleSessionEvent(event);
+      },
     });
-    this.session = session;
+    await this.lease.acquire(settings);
 
     this.restoreMeter();
 
@@ -137,38 +127,21 @@ export default class AeccDevice extends Homey.Device implements AeccFlowDevice {
       await this.setCapabilityValue('meter_power.charged', 0);
       await this.setCapabilityValue('meter_power.discharged', 0);
     });
-
-    this.unsubscribeSession = session.subscribe(event => {
-      void this.handleSessionEvent(event);
-    });
-
-    this.scheduleStart(created, session, index);
   }
 
-  // Only the device instance that actually created the session (not one
-  // joining an already-running session for the same host:port) starts it,
-  // staggered by its registry index so a batch of devices coming up together
-  // (e.g. after an app update) do not all dial at once.
-  private scheduleStart(
-    created: boolean,
-    session: AeccSession,
-    index: number
-  ): void {
-    if (!created) return;
-    const startDelayMs = index * 1000 + Math.floor(Math.random() * 250);
-    this.pendingStartHandle = this.homey.setTimeout(() => {
-      this.pendingStartHandle = null;
-      void session.start();
-    }, startDelayMs);
+  // The session this device currently holds. Throws rather than handing a
+  // null to the transport if something calls a control path while the
+  // device is between leases.
+  private get session(): AeccSession {
+    return this.lease.requireSession();
   }
 
-  // The pending start must be cancellable: teardown stops the session through
-  // the registry, but a timer that still fires calls start() again and leaves
-  // an untracked poll loop holding the battery's single TCP session slot.
-  private clearPendingStart(): void {
-    if (this.pendingStartHandle === null) return;
-    this.homey.clearTimeout(this.pendingStartHandle);
-    this.pendingStartHandle = null;
+  private scheduler(): Scheduler {
+    return {
+      setTimeout: (handler, ms) => this.homey.setTimeout(handler, ms),
+      clearTimeout: handle => this.homey.clearTimeout(handle as NodeJS.Timeout),
+      now: () => Date.now(),
+    };
   }
 
   // Hands this device's single TCP session slot back so something else can
@@ -178,31 +151,73 @@ export default class AeccDevice extends Homey.Device implements AeccFlowDevice {
   // between the two the device has no session, and a control command arriving
   // in that window fails honestly rather than reaching the battery.
   async releaseSession(): Promise<void> {
-    const driver = this.driver as AeccDriver;
-    this.clearPendingStart();
-    this.unsubscribeSession?.();
-    this.unsubscribeSession = null;
-    await driver.sessions.release(this.registryKey);
-    // Blanked so a later rebind's own release cannot drop the refcount twice.
-    this.registryKey = '';
+    // Followers first: a solar device holding a second reference would keep
+    // the session polling after this release, and the repair probe would
+    // then fight a live socket and report a failure that is not real.
+    await this.detachPvFollowers();
+    await this.lease.release();
   }
 
   private async rebindSession(settings: AeccDeviceSettings): Promise<void> {
-    const driver = this.driver as AeccDriver;
     await this.releaseSession();
+    await this.lease.acquire(settings);
+    // After this device owns the new key, so followers join a session that
+    // is already acquired and the decision to start it stays here. They are
+    // handed the settings just bound rather than being left to read them
+    // back: on the settings-page path Homey has not persisted them yet.
+    await this.attachPvFollowers(settings);
+  }
 
-    const newKey = registryKeyFor(settings.host, settings.port);
-    let created = false;
-    const { session, index } = driver.sessions.acquire(newKey, () => {
-      created = true;
-      return this.createSession(settings);
-    });
-    this.session = session;
-    this.registryKey = newKey;
-    this.unsubscribeSession = session.subscribe(event => {
-      void this.handleSessionEvent(event);
-    });
-    this.scheduleStart(created, session, index);
+  /**
+   * The solar devices that follow this battery.
+   *
+   * Absent PV driver, absent devices and devices that predate the follower
+   * contract all resolve to an empty list rather than an error: repair and
+   * a settings edit must keep working exactly as they did for the users
+   * who have no PV device at all, which today is all of them.
+   */
+  private pvFollowers(): ReturnType<typeof followersOf> {
+    try {
+      const devices = this.homey.drivers.getDriver('pv').getDevices();
+      return followersOf(devices, this.getData().id);
+    } catch (error) {
+      this.error('Could not look up PV devices', error);
+      return [];
+    }
+  }
+
+  private async detachPvFollowers(): Promise<void> {
+    const followers = this.pvFollowers();
+    if (followers.length > 0) {
+      this.log(
+        `Releasing the session, detaching ${followers.length} PV device(s)`
+      );
+    }
+    for (const follower of followers) {
+      try {
+        await follower.detachFromBattery();
+      } catch (error) {
+        this.error('A PV device failed to detach', error);
+      }
+    }
+  }
+
+  private async attachPvFollowers(
+    settings?: AeccDeviceSettings
+  ): Promise<void> {
+    const followers = this.pvFollowers();
+    if (followers.length > 0 && settings !== undefined) {
+      this.log(
+        `Reattaching ${followers.length} PV device(s) to ${settings.host}:${settings.port}`
+      );
+    }
+    for (const follower of followers) {
+      try {
+        await follower.attachToBattery(settings);
+      } catch (error) {
+        this.error('A PV device failed to reattach', error);
+      }
+    }
   }
 
   // onRepair writes the new address with setSettings, which the SDK
@@ -264,6 +279,13 @@ export default class AeccDevice extends Homey.Device implements AeccFlowDevice {
   }
 
   async onDeleted(): Promise<void> {
+    // Followers first, and deliberately without a reattach: nothing will
+    // point at this battery again. Without this they keep a reference on a
+    // session for a device that no longer exists, which keeps it polling
+    // until the next app restart, and in the window before a staggered
+    // start has fired it leaves them attached to a session nobody ever
+    // starts: connected-looking, never updating, and silent.
+    await this.detachPvFollowers();
     await this.teardown();
   }
 
@@ -325,18 +347,7 @@ export default class AeccDevice extends Homey.Device implements AeccFlowDevice {
       clearTimeout: handle => this.homey.clearTimeout(handle),
       now: () => Date.now(),
     };
-    return new AeccSession({
-      host: settings.host,
-      port: settings.port,
-      brand: settings.brand,
-      limits: {
-        maxChargeW: settings.maxChargePowerW,
-        maxDischargeW: settings.maxDischargePowerW,
-      },
-      scheduler,
-      pollIntervalMs: settings.pollIntervalS * 1000,
-      verifyIntervalMs: settings.verifyIntervalS * 1000,
-    });
+    return new AeccSession(sessionOptionsFrom(settings, scheduler));
   }
 
   private restoreMeter(): void {
@@ -359,12 +370,11 @@ export default class AeccDevice extends Homey.Device implements AeccFlowDevice {
   }
 
   private async teardown(): Promise<void> {
-    this.clearPendingStart();
-    this.unsubscribeSession?.();
-    this.unsubscribeSession = null;
     await this.persistMeter();
-    const driver = this.driver as AeccDriver;
-    await driver.sessions.release(this.registryKey);
+    // The lease blanks its own key, so onDeleted followed by onUninit
+    // releases once rather than dropping the refcount of a session another
+    // device is still using.
+    await this.lease.release();
   }
 
   // --- EMS capability listener ---------------------------------------------

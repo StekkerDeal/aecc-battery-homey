@@ -1,0 +1,40 @@
+{
+  "_note": "SYNTHETIC, not a capture. No diagnostics dump in this project or in the Home Assistant integration has ever recorded a battery generating PV, so this frame is hand built to the shape the closest real capture showed: an AFERIY PS240 reporting SSumInfoList.TotalPVPower 758 while every Storage_list entry reported PvChargingPower 0 and Pv1Power..Pv4Power 0. That combination is the reason the solar device reads the summary field only: a fallback to the per-unit PvChargingPower would report this generating array as producing nothing. Only last_poll is defined here; tests compose it onto the registers of jet-single-unit.json, so the control register set stays single sourced and cannot drift from the real one. Replace this file with a real capture once one exists.",
+  "last_poll": {
+    "Response": "EnergyParameter",
+    "SerialNumber": 123097,
+    "Target": "HA",
+    "Storage_list": [
+      {
+        "DevAddr": 1,
+        "StorageSN": "SIMSN0000000001",
+        "StorageStatus": 1,
+        "PvChargingPower": 0,
+        "AcChargingPower": 0,
+        "BatterySoc": 64,
+        "BatteryDischargingPower": 0,
+        "AcInActivePower": 0,
+        "OffGridLoadPower": 0,
+        "BatteryChargingPower": 0,
+        "PvStringCount": 0,
+        "Pv1Power": 0,
+        "Pv2Power": 0,
+        "Pv3Power": 0,
+        "Pv4Power": 0
+      }
+    ],
+    "SSumInfoList": {
+      "ControlEnableStatus": 1,
+      "MeterTotalActivePower": 2,
+      "TotalPVPower": 758,
+      "TotalPVChargePower": 0,
+      "TotalACChargePower": 0,
+      "TotalSmartLoadElectricalPower": 0,
+      "AverageBatteryAverageSOC": 64,
+      "TotalBatteryOutputPower": 0,
+      "TotalGridOutputPower": 280,
+      "TotalBackUpPower": 0,
+      "TotalChargePower": 0
+    }
+  }
+}

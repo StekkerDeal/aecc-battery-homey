@@ -25,6 +25,19 @@ Homey-specific testing so far covers the JET GreenARK Pro, this app's developmen
 | Fossibot | FBP 1200           | No              | Community confirmed on the Home Assistant integration |
 | TSUN     | PowerTrunk MAU5000 | Yes             | Confirmed working                                     |
 
+## Devices
+
+The app pairs two kinds of device, both from one battery:
+
+| Device                | Class        | What it is                                                                                                                            |
+| --------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------- |
+| **AECC home battery** | `battery`    | The main device: state of charge, power, energy totals and all control. Everything in this readme is about it unless stated otherwise |
+| **AECC PV input**     | `solarpanel` | Optional. The PV generation of a battery you have already added, so it reaches the Homey Energy tab as production                     |
+
+The PV device does not open a connection of its own. It joins the session its battery already runs, because the hardware serves one TCP connection at a time. It is paired by picking the battery it belongs to rather than by entering an address, so a repair or an IP change on the battery carries over automatically, and it never sends a command: all control stays with the battery device.
+
+**Only add it if solar panels are connected to that battery.** The app cannot tell the difference between a battery with no panels and a battery at night, so this is your call, not a detection. A PV device added to a battery without panels simply reads 0 W forever.
+
 ## Requirements
 
 - Homey firmware **12.13.0** or newer (the `target_power` capability this app relies on landed in that release)
@@ -43,6 +56,7 @@ For development or pre-release builds, see [`docs/development.md`](docs/developm
 2. Choose **Search my network** (mDNS discovery) or **Enter the IP address myself**. Discovery can miss devices across VLANs, mesh networks, or when Homey runs in a container, so manual entry is a normal choice, not a fallback.
 3. Pick the battery's **brand** (or **Other** if it is not listed). This only tunes sensor-glitch filtering and an AEG-specific register quirk, it does not gate which devices can be added.
 4. Homey adds the device. Open its **Settings** to adjust the port (default 8080), the poll interval (default 5 seconds, 2 second floor), and the max charge/discharge power limits (default 800W each). Read [Power limits](#power-limits) before raising those: they limit what this app commands, not what the battery is capable of.
+5. **Only if solar panels are connected to that battery:** add a device again, pick **AECC PV input**, and choose the battery you just added. It has no settings of its own and follows that battery from then on.
 
 > **Before pairing a second client, read this:** the battery only serves **one TCP connection at a time**. This app, the vendor app's local mode, and the Home Assistant integration all compete for that single slot. Running more than one of them against the same battery at once is the single most common cause of "cannot connect", see Troubleshooting below.
 
@@ -62,7 +76,22 @@ For development or pre-release builds, see [`docs/development.md`](docs/developm
 | `aecc_last_update`               | -    | Timestamp string of the last successful poll                                                                                                                                              |
 | `button.reset_meters`            | -    | Maintenance action. Resets both energy meters to zero; breaks this device's Homey Energy history continuity                                                                               |
 
+Depending on what your model reports, the battery device also adds `measure_power.grid`, `measure_power.pv`, `measure_power.pv1`, `measure_power.pv2` and `measure_power.backup` at runtime, plus `aecc_signal_strength` when the battery reports WiFi signal strength.
+
+### PV device capabilities
+
+| Capability            | Unit | Notes                                                                                                         |
+| --------------------- | ---- | ------------------------------------------------------------------------------------------------------------- |
+| `measure_power`       | W    | PV generation, positive while generating                                                                      |
+| `meter_power`         | kWh  | Total generated energy, integrated locally. See Energy totals below                                           |
+| `aecc_last_update`    | -    | Timestamp string of the last successful poll                                                                  |
+| `button.reset_meters` | -    | Maintenance action. Resets the generated energy meter to zero; breaks this device's Energy history continuity |
+
+The PV device deliberately exposes **no per-string capability**. The protocol carries `Pv1Power` to `Pv4Power` and a `PvStringCount`, but this firmware family does not appear to populate them locally: they read 0 in every capture across six brands, including one taken while an owner's two bifacial panels were generating 458W according to the summary field. That owner also confirmed the vendor app shows no per-string values anywhere, and the manufacturer's own Home Assistant integration exposes none either ([aecc-battery-local#20](https://github.com/StekkerDeal/aecc-battery-local/issues/20)). Exposing them here would add capabilities that read zero forever. If a firmware update starts populating them, they can be added then, with a capture to verify their scale against.
+
 ### Energy totals
+
+`meter_power` on the PV device is integrated from `SSumInfoList.TotalPVPower`, the battery's own summary of PV generation, and from nothing else. In particular it does not fall back to the per-unit `PvChargingPower`, which is PV going **into the battery** rather than PV coming off the panels, and which read 0 in a capture where the summary reported 758W. The consequence is that a model which does not report the summary field reads as no data rather than as no sun, and that this total will not match a figure derived from the charging-side field elsewhere.
 
 `meter_power.charged` and `meter_power.discharged` are integrated locally by this app from the live `measure_power` signal, because the local protocol exposes no cumulative energy counters at all. They will **not** exactly match the equivalent sensors in the Home Assistant integration, which integrates a different pair of signals from the same battery. This is a deliberate choice, not a bug: integrating the one signed power value this app already polls keeps the Homey Energy animation and these two meters internally consistent with each other, at the cost of them drifting slightly from a differently-computed total elsewhere.
 
@@ -97,6 +126,8 @@ A master/slave stack pairs as **one** Homey device, pointed at the master's IP. 
 Keep both units in **Homey control** with your flows as the only thing deciding power. Never leave two separately registered units in Self-consumption (AI) on the same meter: each tries to zero the same reading without knowing the other exists, and they end up charging and discharging against each other at full power ([#2](https://github.com/StekkerDeal/aecc-battery-homey/issues/2)).
 
 ## Flow cards
+
+All 9 of these are **battery cards**: Homey scopes a card to the driver that declares it, so the PV device never appears in their device pickers. The PV device gets only the cards Homey generates automatically from its own capabilities, which is what you want for a device that reports and never commands.
 
 This app defines 9 custom flow cards: 3 triggers, 1 condition and 5 actions. They come in addition to what Homey generates automatically from the capabilities table above: the standard capabilities `target_power`, `target_power_mode`, `measure_battery`, `measure_power` and `battery_charging_state` still generate their own flow cards automatically (a trigger for every one of them changing, plus a condition and action pair for the setable ones among them), so you get those for free on top of the 9 listed here. `button.reset_meters` remains a maintenance action rather than a flow card.
 
@@ -144,6 +175,18 @@ Expected, see Multi-unit / master-slave stacks above.
 
 **Energy totals do not match the Home Assistant integration for the same battery**
 Expected, see Energy totals above.
+
+**My PV device reads 0 W all day**
+Either no panels are connected to that battery, or the model does not report the PV summary field. A device that reports nothing at all shows an empty `measure_power` rather than 0, so a steady 0 means the battery is reporting no generation.
+
+**I deleted my battery and the PV device went unavailable**
+Expected. The PV device is linked to a specific battery device, and there is no repair flow to re-point it. Delete it and add it again after pairing the battery. The same applies if you re-add a manually paired battery at a different address, which gives it a new identity.
+
+**My PV total does not match my inverter**
+It is integrated from what the battery reports every poll, not read from a meter, so it drifts. It also cannot include what happened while Homey was off: downtime is skipped rather than estimated.
+
+**I set a long poll interval and the meters stopped moving**
+Energy is only integrated across gaps of up to 60 seconds, so a poll interval near the 300 second maximum leaves every interval too wide to count. This affects the battery's two meters and the PV meter alike. Keep the interval well under a minute if you care about the totals.
 
 **Discovery does not find my battery**
 Use **Enter the IP address myself** during pairing instead; this is a normal, fully supported path, not a fallback. Verify the battery answers on TCP port 8080 from a device on the same network first.
