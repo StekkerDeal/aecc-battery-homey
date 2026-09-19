@@ -39,5 +39,11 @@
       "battery_required": "Pick a battery.",
       "failed": "Could not add the PV device."
     }
+  },
+  "repair": {
+    "manual": {
+      "title": "Update the IP address",
+      "intro": "Point this device at the address the battery uses now. Its history, meters and settings are kept."
+    }
   }
 }

@@ -1,0 +1,75 @@
+<header class="homey-header">
+  <h1 class="homey-title" data-i18n="repair.manual.title"></h1>
+  <p class="homey-subtitle" data-i18n="repair.manual.intro"></p>
+</header>
+
+<fieldset class="homey-form-fieldset">
+  <div class="homey-form-group">
+    <label
+      class="homey-form-label"
+      for="host"
+      data-i18n="pair.manual.host"
+    ></label>
+    <input class="homey-form-input" id="host" type="text" value="192.168.1." />
+  </div>
+  <div class="homey-form-group">
+    <label
+      class="homey-form-label"
+      for="port"
+      data-i18n="pair.manual.port"
+    ></label>
+    <input class="homey-form-input" id="port" type="number" value="8080" />
+  </div>
+</fieldset>
+
+<button
+  id="btn-connect"
+  class="homey-button-primary-full"
+  data-i18n="pair.manual.connect"
+></button>
+
+<script type="application/javascript">
+  // This view lives in drivers/battery/repair/ and not in pair/, because a
+  // view id listed under "repair" is resolved against the repair folder. A
+  // repair array pointing at a file that only exists under pair/ fails at
+  // runtime with unknown_error_getting_file, which no validation catches.
+  const connect = document.getElementById('btn-connect');
+  const hostInput = document.getElementById('host');
+  const portInput = document.getElementById('port');
+
+  // Prefilled with the address the device has now, so this reads as a
+  // correction of something wrong rather than an empty form.
+  Homey.emit('current_address')
+    .then(current => {
+      if (!current) return;
+      if (current.host) hostInput.value = current.host;
+      if (current.port) portInput.value = current.port;
+    })
+    .catch(() => {
+      // A driver that cannot report the address is not a reason to block
+      // the repair: the fields keep their defaults and can be typed over.
+    });
+
+  connect.addEventListener('click', async () => {
+    const host = hostInput.value.trim();
+    const port = Number(portInput.value) || 8080;
+
+    if (!host) {
+      Homey.alert(Homey.__('pair.manual.host_required'));
+      return;
+    }
+
+    connect.classList.add('is-loading', 'is-disabled');
+
+    try {
+      await Homey.emit('manual_connect', { host, port });
+      // Repair ends here rather than navigating on: there is no next view,
+      // and Homey.createDevice is not available while repairing because the
+      // device already exists.
+      Homey.done();
+    } catch (error) {
+      connect.classList.remove('is-loading', 'is-disabled');
+      Homey.alert((error && error.message) || Homey.__('pair.manual.failed'));
+    }
+  });
+</script>

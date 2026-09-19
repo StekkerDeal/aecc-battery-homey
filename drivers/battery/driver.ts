@@ -97,6 +97,13 @@ export default class AeccDriver extends Homey.Driver {
     session: Homey.Driver.PairSession,
     device: Homey.Device
   ): Promise<void> {
+    // The view prefills itself with the address being corrected, so a user
+    // fixing a typo does not have to retype an address that is mostly right.
+    session.setHandler('current_address', async () => {
+      const settings = settingsFrom(device.getSettings() as RawSettings);
+      return { host: settings.host, port: settings.port };
+    });
+
     session.setHandler(
       'manual_connect',
       async (data: unknown): Promise<void> => {

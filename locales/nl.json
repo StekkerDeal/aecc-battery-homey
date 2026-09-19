@@ -39,5 +39,11 @@
       "battery_required": "Kies een batterij.",
       "failed": "Kon het PV-apparaat niet toevoegen."
     }
+  },
+  "repair": {
+    "manual": {
+      "title": "IP-adres bijwerken",
+      "intro": "Richt dit apparaat op het adres dat de batterij nu gebruikt. De geschiedenis, meters en instellingen blijven behouden."
+    }
   }
 }
