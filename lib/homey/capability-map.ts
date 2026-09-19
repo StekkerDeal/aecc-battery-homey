@@ -51,15 +51,9 @@ export function mapSnapshot(
     if (telemetry.gridPowerW !== null) {
       updates.push({ id: 'measure_power.grid', value: telemetry.gridPowerW });
     }
-    if (telemetry.pvPowerW !== null) {
-      updates.push({ id: 'measure_power.pv', value: telemetry.pvPowerW });
-    }
-    if (telemetry.pv1PowerW !== null) {
-      updates.push({ id: 'measure_power.pv1', value: telemetry.pv1PowerW });
-    }
-    if (telemetry.pv2PowerW !== null) {
-      updates.push({ id: 'measure_power.pv2', value: telemetry.pv2PowerW });
-    }
+    // PV is not reported here any more: it lives on the solar device from
+    // 1.2.0, which is a solarpanel-class device and so is the only place it
+    // can reach the Homey Energy tab as production.
     if (telemetry.backupPowerW !== null) {
       updates.push({
         id: 'measure_power.backup',
@@ -115,9 +109,6 @@ export function optionalCapabilities(
 ): string[] {
   const ids: string[] = [];
   if (derived.gridPowerW !== null) ids.push('measure_power.grid');
-  if (derived.pvPowerW !== null) ids.push('measure_power.pv');
-  if (derived.pv1PowerW !== null) ids.push('measure_power.pv1');
-  if (derived.pv2PowerW !== null) ids.push('measure_power.pv2');
   if (derived.backupPowerW !== null) ids.push('measure_power.backup');
   if (identity.rssi !== undefined) ids.push('aecc_signal_strength');
   return ids;

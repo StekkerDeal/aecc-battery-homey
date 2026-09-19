@@ -76,7 +76,9 @@ For development or pre-release builds, see [`docs/development.md`](docs/developm
 | `aecc_last_update`               | -    | Timestamp string of the last successful poll                                                                                                                                              |
 | `button.reset_meters`            | -    | Maintenance action. Resets both energy meters to zero; breaks this device's Homey Energy history continuity                                                                               |
 
-Depending on what your model reports, the battery device also adds `measure_power.grid`, `measure_power.pv`, `measure_power.pv1`, `measure_power.pv2` and `measure_power.backup` at runtime, plus `aecc_signal_strength` when the battery reports WiFi signal strength.
+Depending on what your model reports, the battery device also adds `measure_power.grid` and `measure_power.backup` at runtime, plus `aecc_signal_strength` when the battery reports WiFi signal strength.
+
+> **Changed in 1.2.0:** the battery device no longer carries `measure_power.pv`, `.pv1` or `.pv2`. PV moved to the separate PV input device, which is the only place it can reach the Homey Energy tab, and the app removes the three old capabilities from existing devices on first start. Their Insights history goes with them, and a flow referring to one stops working. Add the PV device to get PV back.
 
 ### PV device capabilities
 

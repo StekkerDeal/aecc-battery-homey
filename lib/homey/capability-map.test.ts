@@ -161,7 +161,7 @@ describe('mapSnapshot', () => {
     }
   });
 
-  it('a PV-bearing snapshot yields the PV, grid, backup and signal entries', () => {
+  it('a PV-bearing snapshot yields the grid, backup and signal entries, and no PV', () => {
     const meter = new EnergyIntegrator();
     const snapshot = makeSnapshot({
       telemetry: makeTelemetry({
@@ -181,18 +181,12 @@ describe('mapSnapshot', () => {
       id: 'measure_power.grid',
       value: -120,
     });
-    expect(updateFor(updates, 'measure_power.pv')).toEqual({
-      id: 'measure_power.pv',
-      value: 1800,
-    });
-    expect(updateFor(updates, 'measure_power.pv1')).toEqual({
-      id: 'measure_power.pv1',
-      value: 900,
-    });
-    expect(updateFor(updates, 'measure_power.pv2')).toEqual({
-      id: 'measure_power.pv2',
-      value: 900,
-    });
+    // PV moved to the solar device in 1.2.0. Even a battery reporting a
+    // healthy 1800W of PV must not surface it here, because a
+    // battery-class device cannot reach the Energy tab as production.
+    expect(
+      updates.some(update => update.id.startsWith('measure_power.pv'))
+    ).toBe(false);
     // 0 is a real reading, not an absent one, so it must still be reported.
     expect(updateFor(updates, 'measure_power.backup')).toEqual({
       id: 'measure_power.backup',
@@ -241,7 +235,7 @@ describe('optionalCapabilities', () => {
     expect(ids).toEqual([]);
   });
 
-  it('a PV-bearing device needs the PV, grid and backup capabilities', () => {
+  it('a PV-bearing device needs the grid and backup capabilities, but no PV ones', () => {
     const ids = optionalCapabilities(
       makeTelemetry({
         gridPowerW: 100,
@@ -253,13 +247,7 @@ describe('optionalCapabilities', () => {
       }),
       noIdentity
     );
-    expect(ids).toEqual([
-      'measure_power.grid',
-      'measure_power.pv',
-      'measure_power.pv1',
-      'measure_power.pv2',
-      'measure_power.backup',
-    ]);
+    expect(ids).toEqual(['measure_power.grid', 'measure_power.backup']);
   });
 
   it('adds aecc_signal_strength only when identity.rssi is defined, including 0', () => {
@@ -269,20 +257,23 @@ describe('optionalCapabilities', () => {
     expect(optionalCapabilities(makeTelemetry(), {})).toEqual([]);
   });
 
-  it('supports a single PV string with no PV1/PV2 split', () => {
-    const ids = optionalCapabilities(
-      makeTelemetry({ pvPowerW: 1200, pv1PowerW: null, pv2PowerW: null }),
-      noIdentity
-    );
-    expect(ids).toEqual(['measure_power.pv']);
-  });
-
-  it('supports a split PV1/PV2 device with no combined pv total', () => {
-    const ids = optionalCapabilities(
-      makeTelemetry({ pvPowerW: null, pv1PowerW: 600, pv2PowerW: 600 }),
-      noIdentity
-    );
-    expect(ids).toEqual(['measure_power.pv1', 'measure_power.pv2']);
+  // The battery device no longer adds a PV capability under any shape of
+  // PV telemetry: a single combined total, a per-string split, or both.
+  // Whatever the model reports, PV belongs to the solar device now.
+  it('never asks for a PV capability, whatever PV the model reports', () => {
+    const shapes = [
+      makeTelemetry({ pvPowerW: 1200, pvTotalPowerW: 1200 }),
+      makeTelemetry({ pv1PowerW: 600, pv2PowerW: 600 }),
+      makeTelemetry({
+        pvPowerW: 1200,
+        pvTotalPowerW: 1200,
+        pv1PowerW: 600,
+        pv2PowerW: 600,
+      }),
+    ];
+    for (const telemetry of shapes) {
+      expect(optionalCapabilities(telemetry, noIdentity)).toEqual([]);
+    }
   });
 });
 

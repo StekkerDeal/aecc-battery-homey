@@ -405,24 +405,6 @@
             "nl": "Netvermogen"
           }
         },
-        "measure_power.pv": {
-          "title": {
-            "en": "PV power",
-            "nl": "PV-vermogen"
-          }
-        },
-        "measure_power.pv1": {
-          "title": {
-            "en": "PV string 1",
-            "nl": "PV-string 1"
-          }
-        },
-        "measure_power.pv2": {
-          "title": {
-            "en": "PV string 2",
-            "nl": "PV-string 2"
-          }
-        },
         "measure_power.backup": {
           "title": {
             "en": "Backup power",

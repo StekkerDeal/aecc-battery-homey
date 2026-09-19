@@ -45,11 +45,21 @@ interface OnSettingsEvent {
 // tracked to only call them when the desired set actually changes.
 const OPTIONAL_CAPABILITY_IDS: readonly string[] = [
   'measure_power.grid',
+  'measure_power.backup',
+  'aecc_signal_strength',
+];
+
+// Capabilities this app used to add and no longer does. PV moved to the
+// solar device in 1.2.0, where it also carries a kWh counter and reaches
+// the Homey Energy tab, which it never could from a battery-class device.
+//
+// The sweep is needed because syncOptionalCapabilities only ever removes
+// ids it still knows about: dropping them from the list above without this
+// would leave them on every existing device, frozen at their last value.
+const REMOVED_CAPABILITY_IDS: readonly string[] = [
   'measure_power.pv',
   'measure_power.pv1',
   'measure_power.pv2',
-  'measure_power.backup',
-  'aecc_signal_strength',
 ];
 
 export default class AeccDevice extends Homey.Device implements AeccFlowDevice {
@@ -94,6 +104,8 @@ export default class AeccDevice extends Homey.Device implements AeccFlowDevice {
     if (this.getCapabilityValue('target_power') === null) {
       await this.setCapabilityValue('target_power', 0);
     }
+
+    await this.dropRemovedCapabilities();
 
     this.currentOptionalCapabilities = new Set(
       this.getCapabilities().filter(id => OPTIONAL_CAPABILITY_IDS.includes(id))
@@ -553,6 +565,21 @@ export default class AeccDevice extends Homey.Device implements AeccFlowDevice {
       expected: event.expectedPowerW,
       found: event.foundPowerW,
     });
+  }
+
+  // Runs on every boot, which costs a hasCapability lookup per id once the
+  // sweep has nothing left to do. Kept for exactly that reason: a device
+  // that was offline during the upgrade still gets cleaned up whenever it
+  // comes back.
+  private async dropRemovedCapabilities(): Promise<void> {
+    for (const id of REMOVED_CAPABILITY_IDS) {
+      if (!this.hasCapability(id)) continue;
+      try {
+        await this.removeCapability(id);
+      } catch (error) {
+        this.error(`Could not remove the retired capability ${id}`, error);
+      }
+    }
   }
 
   private async syncOptionalCapabilities(
