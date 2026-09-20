@@ -10,5 +10,8 @@
   "1.1.0": {
     "en": "TSUN added as a selectable brand, confirmed working on the PowerTrunk MAU5000 and allowed up to 2500W, plus Fossibot now selectable during pairing and two fixes to how the app holds the battery's single connection.",
     "nl": "TSUN toegevoegd als selecteerbaar merk, bevestigd werkend op de PowerTrunk MAU5000 en toegestaan tot 2500W, waar elk ander merk op 2400W blijft. Fossibot is nu ook tijdens het koppelen te kiezen en niet langer alleen in de instellingen achteraf. Verder twee correcties rond de ene verbinding die de batterij tegelijk toestaat: een apparaat stoppen laat geen verbinding meer openstaan die de batterij bezet houdt, en herstellen naar het adres dat het apparaat al gebruikt meldt niet langer een fout terwijl er niets mis is."
+  },
+  "1.2.0": {
+    "en": "Solar panels on your battery now appear as their own device in Homey Energy, plus fixes for the repair screen, the last update time and the advice shown when the app cannot connect."
   }
 }
