@@ -91,7 +91,9 @@ Depending on what your model reports, the battery device also adds `measure_powe
 | `aecc_last_update`    | -    | Timestamp string of the last successful poll                                                                  |
 | `button.reset_meters` | -    | Maintenance action. Resets the generated energy meter to zero; breaks this device's Energy history continuity |
 
-The PV device deliberately exposes **no per-string capability**. The protocol carries `Pv1Power` to `Pv4Power` and a `PvStringCount`, but this firmware family does not appear to populate them locally: they read 0 in every capture across six brands, including one taken while an owner's two bifacial panels were generating 458W according to the summary field. That owner also confirmed the vendor app shows no per-string values anywhere, and the manufacturer's own Home Assistant integration exposes none either ([aecc-battery-local#20](https://github.com/StekkerDeal/aecc-battery-local/issues/20)). Exposing them here would add capabilities that read zero forever. If a firmware update starts populating them, they can be added then, with a capture to verify their scale against.
+`measure_power.pv1` and `measure_power.pv2` are added when your model reports those fields, exactly as they were on the battery device before they moved here.
+
+**They may well read 0 forever.** This firmware family does not appear to fill them: they are 0 in every capture across six brands, including one taken while an owner's two bifacial panels were generating 458W according to the summary field, and that owner confirmed the vendor app shows no per-string values either ([aecc-battery-local#20](https://github.com/StekkerDeal/aecc-battery-local/issues/20)). They are carried over rather than dropped so that nobody whose firmware does fill them loses a working sensor. `Pv3Power` and `Pv4Power` stay unmapped: no capture has ever shown a non-zero value for them, so their scale is unverified.
 
 ### Energy totals
 

@@ -21,6 +21,12 @@
     "meter_power": {
       "title": { "en": "Generated energy", "nl": "Opgewekte energie" }
     },
+    "measure_power.pv1": {
+      "title": { "en": "PV string 1", "nl": "PV-string 1" }
+    },
+    "measure_power.pv2": {
+      "title": { "en": "PV string 2", "nl": "PV-string 2" }
+    },
     "button.reset_meters": {
       "maintenanceAction": true,
       "title": { "en": "Reset meter", "nl": "Meter resetten" },

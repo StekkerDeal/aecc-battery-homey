@@ -13,7 +13,11 @@ import {
   shouldPersistProductionMeter,
   type ProductionIntegratorState,
 } from '../../lib/protocol/energy-meter';
-import { mapPvSnapshot } from '../../lib/homey/capability-map';
+import {
+  mapPvSnapshot,
+  pvOptionalCapabilities,
+} from '../../lib/homey/capability-map';
+import type { DerivedTelemetry } from '../../lib/protocol/telemetry';
 import {
   settingsFrom,
   type AeccDeviceSettings,
@@ -39,6 +43,7 @@ export default class AeccPvDevice extends Homey.Device implements PvFollower {
   private lease!: SessionLease;
   private meter!: ProductionIntegrator;
 
+  private currentOptionalCapabilities = new Set<string>();
   private lastPersistedGeneratedKwh = 0;
   private lastPersistedAtMs = 0;
   // Serialises attach and detach against each other, see attachToBattery.
@@ -227,6 +232,13 @@ export default class AeccPvDevice extends Homey.Device implements PvFollower {
   }
 
   private async handleSnapshot(snapshot: SessionSnapshot): Promise<void> {
+    // Before any capability write: writing to a capability this device does
+    // not have throws, and that would abort the rest of this handler on
+    // every poll from then on.
+    if (snapshot.telemetry) {
+      await this.syncOptionalCapabilities(snapshot.telemetry);
+    }
+
     const watts = snapshot.telemetry?.pvTotalPowerW ?? null;
     if (watts !== null) {
       this.meter.sample(snapshot.lastGoodPollAtMs ?? Date.now(), watts);
@@ -242,6 +254,28 @@ export default class AeccPvDevice extends Homey.Device implements PvFollower {
     }
 
     await this.maybePersistMeter(snapshot.lastPollAtMs ?? Date.now());
+  }
+
+  /**
+   * Adds or removes the per-string sub-capabilities to match what the model
+   * reports. addCapability and removeCapability are expensive, so the set
+   * this device already has is cached and only a real change is acted on.
+   */
+  private async syncOptionalCapabilities(
+    telemetry: DerivedTelemetry
+  ): Promise<void> {
+    const desired = new Set(pvOptionalCapabilities(telemetry));
+    const toAdd = [...desired].filter(
+      id => !this.currentOptionalCapabilities.has(id)
+    );
+    const toRemove = [...this.currentOptionalCapabilities].filter(
+      id => !desired.has(id)
+    );
+    if (toAdd.length === 0 && toRemove.length === 0) return;
+
+    for (const id of toAdd) await this.addCapability(id);
+    for (const id of toRemove) await this.removeCapability(id);
+    this.currentOptionalCapabilities = desired;
   }
 
   private restoreMeter(): void {

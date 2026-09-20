@@ -212,10 +212,12 @@ whether a battery has PV hardware, nor how many strings it has.
 
 The practical consequence: a battery with no panels and a battery at night
 are indistinguishable over this protocol. The Homey app therefore asks the
-owner to confirm that panels exist rather than detecting it, and exposes the
-summary total only. Per-string capabilities become worth adding if, and only
-if, a firmware update starts populating those fields, which a fresh capture
-would show.
+owner to confirm that panels exist rather than detecting it. It integrates
+the summary total only, and carries `Pv1Power` and `Pv2Power` through as
+display-only readings when the model reports them, so a firmware that does
+fill them is not thrown away. They are kept out of the energy total on
+purpose: their scale rests on no non-zero observation, so a wrong one
+cannot corrupt a kWh counter.
 
 ## Security: DeviceManagement exposes credentials
 

@@ -73,26 +73,52 @@ export function mapSnapshot(
 
 /**
  * Maps one session snapshot plus the PV meter to the solar device's
- * capabilities. Three values, always present, no runtime sub-capabilities:
- * per-string readings are deliberately absent until a capture from a
- * generating system settles what the PvXPower fields actually mean.
+ * capabilities.
  *
  * measure_power is null rather than 0 when there is no reading, so a model
  * that does not report PV at all reads as unknown instead of as darkness.
+ *
+ * The per-string readings follow the same rule the battery device used
+ * before they moved here: reported when the model has the field at all.
+ * Every capture so far shows them at 0 even while the summary reports real
+ * generation, so they may well stay at zero, but they are carried over
+ * rather than dropped so that nobody whose firmware does fill them loses a
+ * working sensor in the move.
  */
 export function mapPvSnapshot(
   snapshot: SessionSnapshot,
   meter: ProductionIntegrator,
   timeZone: string
 ): CapabilityUpdate[] {
-  return [
-    { id: 'measure_power', value: snapshot.telemetry?.pvTotalPowerW ?? null },
+  const telemetry = snapshot.telemetry;
+
+  const updates: CapabilityUpdate[] = [
+    { id: 'measure_power', value: telemetry?.pvTotalPowerW ?? null },
     { id: 'meter_power', value: roundKwh(meter.generatedKwh) },
     {
       id: 'aecc_last_update',
       value: formatLocalTimestamp(snapshot.lastGoodPollAtMs, timeZone),
     },
   ];
+
+  if (telemetry) {
+    if (telemetry.pv1PowerW !== null) {
+      updates.push({ id: 'measure_power.pv1', value: telemetry.pv1PowerW });
+    }
+    if (telemetry.pv2PowerW !== null) {
+      updates.push({ id: 'measure_power.pv2', value: telemetry.pv2PowerW });
+    }
+  }
+
+  return updates;
+}
+
+/** Sub-capability ids the solar device should have, by the same rule. */
+export function pvOptionalCapabilities(derived: DerivedTelemetry): string[] {
+  const ids: string[] = [];
+  if (derived.pv1PowerW !== null) ids.push('measure_power.pv1');
+  if (derived.pv2PowerW !== null) ids.push('measure_power.pv2');
+  return ids;
 }
 
 /**
