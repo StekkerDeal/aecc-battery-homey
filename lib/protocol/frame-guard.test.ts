@@ -124,6 +124,7 @@ describe('FrameGuard', () => {
   it('exposes running stats via the stats getter', () => {
     const guard = new FrameGuard();
     expect(guard.stats).toEqual({
+      suspectStreak: 0,
       suspectFramesTotal: 0,
       lastReason: null,
       lastAt: null,
@@ -132,9 +133,21 @@ describe('FrameGuard', () => {
     guard.accept(frameWith(10));
     guard.accept(frameWith(0));
     const stats = guard.stats;
+    expect(stats.suspectStreak).toBe(1);
     expect(stats.suspectFramesTotal).toBe(1);
     expect(stats.lastReason).toMatch(/SOC collapsed/);
     expect(stats.lastAt).not.toBeNull();
+  });
+
+  it('counts the suspect streak up while frames are held and resets it on an accepted frame', () => {
+    const guard = new FrameGuard();
+    guard.accept(frameWith(10));
+    guard.accept(frameWith(0));
+    guard.accept(frameWith(0));
+    expect(guard.stats.suspectStreak).toBe(2);
+    guard.accept(frameWith(10));
+    expect(guard.stats.suspectStreak).toBe(0);
+    expect(guard.stats.suspectFramesTotal).toBe(2);
   });
 
   it('stamps the stats timestamp from the injected clock', () => {

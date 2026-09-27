@@ -25,7 +25,11 @@ import {
   type WorkMode,
 } from './protocol/control';
 import { decodeSlot } from './protocol/slot';
-import { readRegister, unwrapContainer } from './protocol/frames';
+import {
+  readRegister,
+  ResponseShapeError,
+  unwrapContainer,
+} from './protocol/frames';
 import {
   REG_AI_SMART_CHARGE,
   REG_AI_SMART_DISC,
@@ -125,6 +129,30 @@ export interface WriteHistoryEntry {
   verify: VerifyEntry[] | null;
 }
 
+// What readInitialState found on the device before this session wrote
+// anything. Kept apart from the live fields, which every write overwrites.
+export interface InitialDeviceState {
+  minSoc: number | null;
+  maxSoc: number | null;
+  workMode: WorkMode;
+  // Signed like commandedTargetPowerW. Null unless slot 1 was enabled and
+  // decoded, as HA's initial_power: a disabled slot is no setpoint at all.
+  targetPowerW: number | null;
+}
+
+// Private state the diagnostics dump needs and nothing else reads.
+export interface SessionDiagnosticsState {
+  limits: SetpointLimits;
+  pollIntervalMs: number;
+  initial: InitialDeviceState | null;
+  // The last EnergyParameter response the frame guard accepted, exactly as
+  // the device sent it (envelope fields included). A frame the guard holds
+  // back does not replace it, as in HA's last_poll.
+  lastRawFrame: Record<string, unknown> | null;
+  cleanerLastAccepted: Record<string, number>;
+  cleanerLastAcceptedAtMs: Record<string, number>;
+}
+
 export type SessionEvent =
   | { type: 'snapshot'; snapshot: SessionSnapshot }
   | { type: 'available' }
@@ -143,7 +171,7 @@ export type SessionEvent =
 
 export type SessionListener = (event: SessionEvent) => void;
 
-function directionOf(targetPowerW: number): Direction {
+export function directionOf(targetPowerW: number): Direction {
   return targetPowerW > 0 ? 'charge' : targetPowerW < 0 ? 'discharge' : 'idle';
 }
 
@@ -180,6 +208,8 @@ export class AeccSession {
   private maxSoc = 100;
   private hasStorageList = false;
   private rssiSupported = false;
+  private initialState: InitialDeviceState | null = null;
+  private lastRawFrame: Record<string, unknown> | null = null;
 
   private consecutiveFailedPolls = 0;
   private unavailableEmitted = false;
@@ -234,6 +264,33 @@ export class AeccSession {
 
   get writeHistory(): WriteHistoryEntry[] {
     return [...this.writeHistoryEntries];
+  }
+
+  get diagnosticsState(): SessionDiagnosticsState {
+    return {
+      limits: this.limits,
+      pollIntervalMs: this.pollIntervalMs,
+      initial: this.initialState,
+      lastRawFrame: this.lastRawFrame,
+      cleanerLastAccepted: Object.fromEntries(this.cleanerLastAccepted),
+      cleanerLastAcceptedAtMs: Object.fromEntries(this.cleanerLastAcceptedAt),
+    };
+  }
+
+  /**
+   * Reads control registers for the diagnostics dump. Goes through the same
+   * client queue as polling, so it waits for an in-flight poll rather than
+   * opening anything of its own. Null when the device did not answer;
+   * throws ResponseShapeError when it answered without a register map.
+   */
+  async readControlRegisters(
+    addresses: number[]
+  ): Promise<Record<string, unknown> | null> {
+    const resp = await this.client.getControlParameters(addresses);
+    if (resp === null) return null;
+    const params = unwrapContainer(resp, 'control');
+    if (params === null) throw new ResponseShapeError(Object.keys(resp));
+    return params;
   }
 
   subscribe(fn: SessionListener): () => void {
@@ -303,27 +360,41 @@ export class AeccSession {
     const aiDischarge = readRegister(params, REG_AI_SMART_DISC);
     const slotRaw = readRegister(params, REG_CONTROL_TIME1);
 
+    const initial: InitialDeviceState = {
+      minSoc: null,
+      maxSoc: null,
+      workMode:
+        aiCharge === '1' || aiDischarge === '1' ? 'self_consumption' : 'custom',
+      targetPowerW: null,
+    };
     if (minSocRaw !== undefined) {
       const parsed = Number(minSocRaw);
-      if (Number.isFinite(parsed)) this.minSoc = parsed;
+      if (Number.isFinite(parsed)) initial.minSoc = parsed;
     }
     if (maxSocRaw !== undefined) {
       const parsed = Number(maxSocRaw);
-      if (Number.isFinite(parsed)) this.maxSoc = parsed;
+      if (Number.isFinite(parsed)) initial.maxSoc = parsed;
     }
-    if (slotRaw !== undefined) {
-      const decoded = decodeSlot(slotRaw);
-      if (decoded !== null) {
-        this.commandedTargetPowerW =
-          decoded.direction === 'charge'
-            ? decoded.powerW
-            : decoded.direction === 'discharge'
-              ? -decoded.powerW
-              : 0;
-      }
+    const decoded = slotRaw === undefined ? null : decodeSlot(slotRaw);
+    const slotTargetW =
+      decoded === null
+        ? null
+        : decoded.direction === 'charge'
+          ? decoded.powerW
+          : decoded.direction === 'discharge'
+            ? -decoded.powerW
+            : 0;
+    if (slotTargetW !== null && slotRaw?.split(',')[0] === '1') {
+      initial.targetPowerW = slotTargetW;
     }
-    this.workMode =
-      aiCharge === '1' || aiDischarge === '1' ? 'self_consumption' : 'custom';
+
+    if (initial.minSoc !== null) this.minSoc = initial.minSoc;
+    if (initial.maxSoc !== null) this.maxSoc = initial.maxSoc;
+    if (slotTargetW !== null) this.commandedTargetPowerW = slotTargetW;
+    this.workMode = initial.workMode;
+    // First successful read only: a later call must not replace what the
+    // device held before this session started writing to it.
+    if (this.initialState === null) this.initialState = initial;
     this.emitSnapshot();
   }
 
@@ -422,6 +493,9 @@ export class AeccSession {
     this.maybeEmitAvailable();
 
     const guarded = this.frameGuard.accept(frame);
+    // As HA's last_poll: the last frame the guard accepted, so a dump taken
+    // during a hold shows what the app is using, not what it rejected.
+    if (!guarded.held) this.lastRawFrame = raw;
     this.applyFrame(guarded.frame, nowMs);
     this.lastGoodPollAtMs = nowMs;
 
@@ -588,7 +662,7 @@ export class AeccSession {
       }
 
       const ok = resp !== null;
-      const verify = ok ? await this.verifyWrite(payload, operation) : null;
+      const verify = ok ? await this.verifyWrite(payload) : null;
       this.recordWrite({
         timestampMs: this.scheduler.now(),
         operation,
@@ -603,8 +677,7 @@ export class AeccSession {
   }
 
   private async verifyWrite(
-    expected: ControlPayload,
-    _operation: string
+    expected: ControlPayload
   ): Promise<VerifyEntry[] | null> {
     await this.sleep(WRITE_VERIFY_DELAY_MS);
     const regAddrs = Object.keys(expected).map(Number);

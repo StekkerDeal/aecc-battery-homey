@@ -1,6 +1,6 @@
 import { EventEmitter } from 'node:events';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { AeccClient } from './client';
+import { AeccClient, OutageLog } from './client';
 import type { SocketFactory, SocketLike } from './connection';
 
 // Auto-connects and auto-closes via real fake-timer setTimeout(0) calls
@@ -210,7 +210,7 @@ describe('AeccClient basic requests', () => {
     expect(client.consecutiveFailures).toBe(0);
   });
 
-  it('logs the malformed body so a protocol error is diagnosable', async () => {
+  it('logs the JSON type and size of a malformed body, never the body', async () => {
     const socket = new FakeSocket();
     const errors: string[] = [];
     const client = new AeccClient({
@@ -228,9 +228,33 @@ describe('AeccClient basic requests', () => {
     socket.reply([1, 2, 3]);
     await pending;
 
-    expect(errors).toHaveLength(1);
-    expect(errors[0]).toContain('EnergyParameter protocol error');
-    expect(errors[0]).toContain('[1,2,3]');
+    expect(errors).toEqual([
+      'GET EnergyParameter protocol error: response was a JSON array, not an object (7 bytes)',
+    ]);
+  });
+
+  it('thins out repeated protocol errors like any other outage', async () => {
+    const socket = new FakeSocket();
+    const errors: string[] = [];
+    const client = new AeccClient({
+      host: 'h',
+      port: 1,
+      socketFactory: autoConnectFactory([socket]),
+      logger: {
+        log: () => {},
+        error: (...args) => errors.push(args.join(' ')),
+      },
+    });
+
+    for (let i = 0; i < 5; i += 1) {
+      const pending = client.getEnergyParameters();
+      await flush();
+      socket.reply([i]);
+      expect(await pending).toBeNull();
+    }
+
+    // Failures 1, 2 and 4 of 5.
+    expect(errors).toHaveLength(3);
   });
 
   // The safe register list already keeps WiFi credentials out of a
@@ -412,6 +436,126 @@ describe('AeccClient read timeout handling', () => {
       expect(await pending).toBeNull();
     }
     expect(socket.destroyed).toBe(false);
+  });
+});
+
+describe('OutageLog', () => {
+  it('logs failures 1, 2, 4 and 8 of an outage and nothing in between', () => {
+    const log = new OutageLog();
+    const logged: number[] = [];
+    for (let n = 1; n <= 10; n += 1) {
+      if (log.noteFailure()) logged.push(n);
+    }
+    expect(logged).toEqual([1, 2, 4, 8]);
+  });
+
+  it('reports the outage length on success and starts counting afresh', () => {
+    const log = new OutageLog();
+    log.noteFailure();
+    log.noteFailure();
+    log.noteFailure();
+    expect(log.noteSuccess()).toBe(3);
+    expect(log.noteSuccess()).toBe(0);
+    expect(log.noteFailure()).toBe(true);
+  });
+});
+
+describe('AeccClient outage logging', () => {
+  it('thins out repeated read timeouts and logs the recovery once', async () => {
+    const s1 = new FakeSocket();
+    const s2 = new FakeSocket();
+    const errors: string[] = [];
+    const logs: string[] = [];
+    const client = new AeccClient({
+      host: 'h',
+      port: 1,
+      readTimeoutMs: 100,
+      socketFactory: autoConnectFactory([s1, s2]),
+      logger: {
+        log: (...args) => logs.push(args.join(' ')),
+        error: (...args) => errors.push(args.join(' ')),
+      },
+    });
+
+    for (let i = 0; i < 5; i += 1) {
+      const pending = client.getEnergyParameters();
+      await flush();
+      await vi.advanceTimersByTimeAsync(100);
+      expect(await pending).toBeNull();
+    }
+    // Failures 1, 2 and 4 of 5.
+    expect(errors).toHaveLength(3);
+
+    const pending = client.getEnergyParameters();
+    await flush();
+    s2.reply({ ok: true });
+    expect(await pending).toEqual({ ok: true });
+    expect(logs).toEqual([
+      'GET EnergyParameter: device answering again after 5 failed request(s)',
+    ]);
+  });
+
+  it('thins out connection errors and their reconnect lines together', async () => {
+    // Every dial after the first fails, so each failed request logs a
+    // connection error and a failed reconnect when it is a logged failure.
+    const first = new FakeSocket();
+    let dials = 0;
+    const factory: SocketFactory = () => {
+      dials += 1;
+      if (dials === 1) {
+        setTimeout(() => first.connect(), 0);
+        return first;
+      }
+      throw new Error('EHOSTUNREACH');
+    };
+    const errors: string[] = [];
+    const client = new AeccClient({
+      host: 'h',
+      port: 1,
+      backoffBaseMs: 10,
+      backoffMaxMs: 10,
+      socketFactory: factory,
+      logger: {
+        log: () => {},
+        error: (...args) => errors.push(args.join(' ')),
+      },
+    });
+
+    const opening = client.getEnergyParameters();
+    await flush();
+    first.emit('error', new Error('ECONNRESET'));
+    await vi.runAllTimersAsync();
+    expect(await opening).toBeNull();
+
+    for (let i = 0; i < 4; i += 1) {
+      const pending = client.getEnergyParameters();
+      await vi.runAllTimersAsync();
+      expect(await pending).toBeNull();
+    }
+
+    // Five failures, of which 1, 2 and 4 are logged, each as a pair.
+    const connection = errors.filter(e => e.includes('connection error'));
+    const reconnect = errors.filter(e => e.includes('reconnect failed'));
+    expect(connection).toHaveLength(3);
+    expect(reconnect).toHaveLength(3);
+  });
+
+  it('logs nothing on success when there was no outage', async () => {
+    const socket = new FakeSocket();
+    const logs: string[] = [];
+    const client = new AeccClient({
+      host: 'h',
+      port: 1,
+      socketFactory: autoConnectFactory([socket]),
+      logger: { log: (...args) => logs.push(args.join(' ')), error: () => {} },
+    });
+
+    const pending = client.getEnergyParameters();
+    await flush();
+    socket.reply({ ok: true });
+    await pending;
+
+    expect(logs).toEqual([]);
   });
 });
 

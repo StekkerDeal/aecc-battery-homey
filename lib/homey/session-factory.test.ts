@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { sessionOptionsFrom } from './session-factory';
 import type { AeccDeviceSettings } from './device-settings';
 import type { Scheduler } from '../session';
+import { silentLogger } from '../logger';
 
 function buildSettings(
   overrides: Partial<AeccDeviceSettings> = {}
@@ -34,7 +35,7 @@ describe('sessionOptionsFrom', () => {
       brand: 'aeg',
     });
 
-    const options = sessionOptionsFrom(settings, fakeScheduler());
+    const options = sessionOptionsFrom(settings, fakeScheduler(), silentLogger);
 
     expect(options.host).toBe('10.0.0.5');
     expect(options.port).toBe(502);
@@ -47,7 +48,7 @@ describe('sessionOptionsFrom', () => {
       maxDischargePowerW: 1500,
     });
 
-    const options = sessionOptionsFrom(settings, fakeScheduler());
+    const options = sessionOptionsFrom(settings, fakeScheduler(), silentLogger);
 
     expect(options.limits).toEqual({
       maxChargeW: 1200,
@@ -63,7 +64,7 @@ describe('sessionOptionsFrom', () => {
       verifyIntervalS: 90,
     });
 
-    const options = sessionOptionsFrom(settings, fakeScheduler());
+    const options = sessionOptionsFrom(settings, fakeScheduler(), silentLogger);
 
     expect(options.pollIntervalMs).toBe(5000);
     expect(options.verifyIntervalMs).toBe(90000);
@@ -73,8 +74,22 @@ describe('sessionOptionsFrom', () => {
     const settings = buildSettings();
     const scheduler = fakeScheduler();
 
-    const options = sessionOptionsFrom(settings, scheduler);
+    const options = sessionOptionsFrom(settings, scheduler, silentLogger);
 
     expect(options.scheduler).toBe(scheduler);
+  });
+
+  // Without it the session falls back to a silent logger and transport
+  // errors never reach the app log a diagnostic report carries.
+  it('passes the logger through by reference', () => {
+    const logger = { log: () => {}, error: () => {} };
+
+    const options = sessionOptionsFrom(
+      buildSettings(),
+      fakeScheduler(),
+      logger
+    );
+
+    expect(options.logger).toBe(logger);
   });
 });

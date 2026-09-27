@@ -77,6 +77,7 @@ For development or pre-release builds, see [`docs/development.md`](docs/developm
 | `aecc_max_soc` (Charge limit)    | %    | Battery stops charging at this SOC, 50-100%                                                                                                                                               |
 | `aecc_last_update`               | -    | Timestamp string of the last successful poll                                                                                                                                              |
 | `button.reset_meters`            | -    | Maintenance action. Resets both energy meters to zero; breaks this device's Homey Energy history continuity                                                                               |
+| `button.diagnostics`             | -    | Maintenance action. Writes a diagnostics dump to the app log for a diagnostic report. See Sending diagnostics below                                                                       |
 
 Depending on what your model reports, the battery device also adds `measure_power.grid` and `measure_power.backup` at runtime, plus `aecc_signal_strength` when the battery reports WiFi signal strength.
 
@@ -93,7 +94,7 @@ Depending on what your model reports, the battery device also adds `measure_powe
 
 `measure_power.pv1` and `measure_power.pv2` are added when your model reports those fields, exactly as they were on the battery device before they moved here.
 
-**They may well read 0 forever.** This firmware family does not appear to fill them: they are 0 in every capture across six brands, including one taken while an owner's two bifacial panels were generating 458W according to the summary field, and that owner confirmed the vendor app shows no per-string values either ([aecc-battery-local#20](https://github.com/StekkerDeal/aecc-battery-local/issues/20)). They are carried over rather than dropped so that nobody whose firmware does fill them loses a working sensor. `Pv3Power` and `Pv4Power` stay unmapped: no capture has ever shown a non-zero value for them, so their scale is unverified.
+**Whether they carry a value depends on the brand.** A Sunpura S2400 fills both in watts, and the two add up to the PV total. A JET GreenARK Pro and an Oscal generating several hundred watts reported 0 on both, and that Oscal owner confirmed the vendor app shows no per-string values either ([aecc-battery-local#20](https://github.com/StekkerDeal/aecc-battery-local/issues/20)). On a model like that they read 0 forever, which is the battery not reporting strings, not the app losing them. `Pv3Power` and `Pv4Power` stay unmapped: no capture has ever shown a non-zero value for them.
 
 ### Energy totals
 
@@ -135,7 +136,7 @@ Keep both units in **Homey control** with your flows as the only thing deciding 
 
 All 9 of these are **battery cards**: Homey scopes a card to the driver that declares it, so the PV device never appears in their device pickers. The PV device gets only the cards Homey generates automatically from its own capabilities, which is what you want for a device that reports and never commands.
 
-This app defines 9 custom flow cards: 3 triggers, 1 condition and 5 actions. They come in addition to what Homey generates automatically from the capabilities table above: the standard capabilities `target_power`, `target_power_mode`, `measure_battery`, `measure_power` and `battery_charging_state` still generate their own flow cards automatically (a trigger for every one of them changing, plus a condition and action pair for the setable ones among them), so you get those for free on top of the 9 listed here. `button.reset_meters` remains a maintenance action rather than a flow card.
+This app defines 9 custom flow cards: 3 triggers, 1 condition and 5 actions. They come in addition to what Homey generates automatically from the capabilities table above: the standard capabilities `target_power`, `target_power_mode`, `measure_battery`, `measure_power` and `battery_charging_state` still generate their own flow cards automatically (a trigger for every one of them changing, plus a condition and action pair for the setable ones among them), so you get those for free on top of the 9 listed here. `button.reset_meters` and `button.diagnostics` remain maintenance actions rather than flow cards.
 
 ### Triggers
 
@@ -204,6 +205,16 @@ Open an issue on [GitHub](https://github.com/StekkerDeal/aecc-battery-homey/issu
 - Homey firmware version and this app's version
 - The battery's brand and model, as set during pairing
 - What you did, what you expected, and what happened instead
+- A diagnostic report, see below
+
+#### Sending diagnostics
+
+The battery device has a maintenance action, **Write diagnostics to log**. Each press writes one line to the app log with what the battery reports at that moment: its raw live data, its control registers, and what the app made of them. Serial numbers and the IP address are removed first, using the same list the Home Assistant integration uses, and the WiFi settings are never read.
+
+While the problem is happening, press **Write diagnostics to log**. For a problem that depends on the situation, press it once in each situation, for example once while charging from the grid and once while charging from the panels. Then get the lines to us in either of two ways:
+
+- **Download the app log** and paste the lines starting with `AECC_DIAGNOSTICS` into the issue.
+- **Send a diagnostic report** from this app's settings in the Homey app, with the issue number in the message, and note in the issue when you sent it. A report carries the app's recent log, so send it soon after pressing the button and before updating the app.
 
 If you can reproduce the problem while running a development build (`npm run dev`, see [`docs/development.md`](docs/development.md)), include the relevant lines from the terminal output. Seeing exactly what the app sent and what the battery replied is the fastest way for a maintainer to trace the real cause.
 

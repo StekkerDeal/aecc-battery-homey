@@ -390,7 +390,8 @@
         "aecc_min_soc",
         "aecc_max_soc",
         "aecc_last_update",
-        "button.reset_meters"
+        "button.reset_meters",
+        "button.diagnostics"
       ],
       "capabilitiesOptions": {
         "measure_power": {
@@ -456,6 +457,17 @@
           "desc": {
             "en": "Resets the charged and discharged energy meters to zero. This breaks the continuity of this device's history in Homey Energy.",
             "nl": "Zet de meters voor geladen en ontladen energie terug naar nul. Dit onderbreekt de continuïteit van de geschiedenis van dit apparaat in Homey Energie."
+          }
+        },
+        "button.diagnostics": {
+          "maintenanceAction": true,
+          "title": {
+            "en": "Write diagnostics to log",
+            "nl": "Diagnostics naar log schrijven"
+          },
+          "desc": {
+            "en": "Writes what the battery reports right now to the app log, with serial numbers and the IP address removed. Then download the app log, or send a diagnostic report from this app's settings.",
+            "nl": "Schrijft wat de batterij op dit moment doorgeeft naar het app-log, zonder serienummers en IP-adres. Download daarna het app-log, of verstuur een diagnostic report vanuit de instellingen van deze app."
           }
         }
       },

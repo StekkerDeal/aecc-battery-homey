@@ -7,10 +7,12 @@ import {
   type SessionEvent,
 } from './session';
 import type { SocketFactory, SocketLike } from './transport/connection';
+import { ResponseShapeError } from './protocol/frames';
 
+// 'bare' answers a control read with the envelope only, no register map.
 type Hook = (
   req: Record<string, unknown>
-) => 'respond' | 'drop' | 'silent' | undefined;
+) => 'respond' | 'drop' | 'silent' | 'bare' | undefined;
 
 // Minimal in-process stand-in for the AECC wire protocol: enough to drive
 // AeccSession through AeccClient/AeccConnection without a real socket, so
@@ -93,6 +95,14 @@ class FakeDeviceSocket extends EventEmitter implements SocketLike {
     }
     if (req.Get === 'Energycontrolparameters') {
       if (mode === 'silent') return;
+      if (mode === 'bare') {
+        this.reply({
+          Response: 'Energycontrolparameters',
+          SerialNumber: serial,
+          Target: target,
+        });
+        return;
+      }
       const addrs = (req.RegControlAddr as number[] | undefined) ?? [];
       const info: Record<string, string> = {};
       for (const a of addrs) {
@@ -742,5 +752,161 @@ describe('AeccSession drift check', () => {
       '0,00:00,00:00,0,0,0,0,0,0,100,10'
     );
     await session.stop();
+  });
+});
+
+describe('AeccSession diagnostics state', () => {
+  it('keeps the last parsed frame exactly as sent, and keeps it through a failed poll', async () => {
+    const { session, socket } = makeSession();
+    const pending = session.start();
+    await vi.advanceTimersByTimeAsync(2000);
+    await pending;
+
+    const first = session.diagnosticsState.lastRawFrame;
+    expect(first?.Response).toBe('EnergyParameter');
+    expect(first?.Storage_list).toEqual(socket.frame.Storage_list);
+
+    socket.hook = () => 'silent';
+    await vi.advanceTimersByTimeAsync(2500);
+
+    expect(session.diagnosticsState.lastRawFrame).toBe(first);
+  });
+
+  // HA's last_poll is the frame after the suspect-frame hold, so a frame the
+  // guard holds back must not replace the one the app is still using.
+  it('keeps the last accepted frame while the frame guard holds a suspect one', async () => {
+    const { session, socket } = makeSession();
+    const pending = session.start();
+    await vi.advanceTimersByTimeAsync(2000);
+    await pending;
+    const accepted = session.diagnosticsState.lastRawFrame;
+
+    socket.frame = {
+      ...socket.frame,
+      Storage_list: [
+        {
+          DevAddr: 1,
+          StorageSN: 'SN1',
+          BatterySoc: 0,
+          AcChargingPower: 0,
+          BatteryDischargingPower: 0,
+          AcInActivePower: 0,
+        },
+      ],
+    };
+    await vi.advanceTimersByTimeAsync(2500);
+
+    // Held, not yet past the guard's tolerance of 3.
+    expect(session.snapshot.frameGuard.suspectStreak).toBeGreaterThan(0);
+    expect(session.diagnosticsState.lastRawFrame).toBe(accepted);
+  });
+
+  it('records the initial device state once and keeps it through later writes', async () => {
+    const { session, socket } = makeSession();
+    socket.registers.set('3023', '15');
+    socket.registers.set('3024', '90');
+    socket.registers.set('3021', '0');
+    socket.registers.set('3022', '0');
+    socket.registers.set('3003', '1,00:00,23:59,-400,0,6,5,0,0,90,15');
+
+    const read = session.readInitialState();
+    await settle();
+    await read;
+    const write = session.setMinSoc(20);
+    await settle();
+    await write;
+    const reread = session.readInitialState();
+    await settle();
+    await reread;
+
+    expect(session.snapshot.minSoc).toBe(20);
+    expect(session.diagnosticsState.initial).toEqual({
+      minSoc: 15,
+      maxSoc: 90,
+      workMode: 'custom',
+      targetPowerW: 400,
+    });
+  });
+
+  it('records the first successful read when an earlier one got no answer', async () => {
+    const { session, socket } = makeSession();
+    socket.hook = () => 'silent';
+    const failed = session.readInitialState();
+    await settle();
+    await failed;
+    expect(session.diagnosticsState.initial).toBeNull();
+
+    socket.hook = null;
+    socket.registers.set('3023', '15');
+    const read = session.readInitialState();
+    await settle();
+    await read;
+
+    expect(session.diagnosticsState.initial?.minSoc).toBe(15);
+  });
+
+  // HA sets initial_power only from an enabled slot 1; a disabled slot, the
+  // usual state in self-consumption, is no setpoint at all.
+  it('records no initial power when slot 1 is disabled', async () => {
+    const { session, socket } = makeSession();
+    socket.registers.set('3003', '0,00:00,23:59,-400,0,6,5,0,0,90,15');
+
+    const read = session.readInitialState();
+    await settle();
+    await read;
+
+    expect(session.diagnosticsState.initial?.targetPowerW).toBeNull();
+    expect(session.snapshot.commandedTargetPowerW).toBe(0);
+  });
+
+  it('exposes limits, poll interval and the cleaner anchors', async () => {
+    const { session } = makeSession();
+    const pending = session.start();
+    await vi.advanceTimersByTimeAsync(2000);
+    await pending;
+
+    const state = session.diagnosticsState;
+    expect(state.limits).toEqual({ maxChargeW: 800, maxDischargeW: 800 });
+    expect(state.pollIntervalMs).toBe(2000);
+    expect(state.cleanerLastAccepted).toEqual({ battery_soc: 50 });
+    expect(typeof state.cleanerLastAcceptedAtMs.battery_soc).toBe('number');
+  });
+});
+
+describe('AeccSession.readControlRegisters', () => {
+  it('returns the unwrapped register map for the requested addresses', async () => {
+    const { session } = makeSession();
+
+    const pending = session.readControlRegisters([3000, 3023, 3024]);
+    await settle();
+
+    expect(await pending).toEqual({ '3000': '1', '3023': '10', '3024': '100' });
+  });
+
+  it('returns null when the device does not answer', async () => {
+    const { session, socket } = makeSession();
+    socket.hook = () => 'silent';
+
+    const pending = session.readControlRegisters([3000]);
+    await settle();
+
+    expect(await pending).toBeNull();
+  });
+
+  it('throws ResponseShapeError naming the keys when the answer holds no register map', async () => {
+    const { session, socket } = makeSession();
+    socket.hook = () => 'bare';
+
+    const pending = session.readControlRegisters([3000]);
+    const outcome = pending.catch((err: unknown) => err);
+    await settle();
+
+    const err = await outcome;
+    expect(err).toBeInstanceOf(ResponseShapeError);
+    expect((err as ResponseShapeError).keys).toEqual([
+      'Response',
+      'SerialNumber',
+      'Target',
+    ]);
   });
 });

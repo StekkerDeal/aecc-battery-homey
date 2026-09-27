@@ -15,6 +15,8 @@ export interface FrameGuardResult {
 }
 
 export interface FrameGuardStats {
+  // Suspect frames held in a row right now; 0 once a frame is accepted.
+  suspectStreak: number;
   suspectFramesTotal: number;
   lastReason: string | null;
   lastAt: string | null;
@@ -109,6 +111,7 @@ export class FrameGuard {
 
   get stats(): FrameGuardStats {
     return {
+      suspectStreak: this.suspectStreak,
       suspectFramesTotal: this.suspectFramesTotal,
       lastReason: this.lastReason,
       lastAt: this.lastAt,

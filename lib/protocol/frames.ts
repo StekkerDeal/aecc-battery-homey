@@ -36,8 +36,6 @@ export function encodeRequest(payload: unknown): Buffer {
   return Buffer.from(JSON.stringify(payload) + '\n', 'utf-8');
 }
 
-const PREVIEW_MAX_CHARS = 200;
-
 // Responses are NOT newline framed: the device streams raw JSON bytes, so we
 // must accumulate and retry JSON.parse on the whole buffer every push.
 export class JsonAccumulator {
@@ -56,13 +54,6 @@ export class JsonAccumulator {
     return this.buffer.length;
   }
 
-  get preview(): string {
-    const text = this.buffer.toString('utf-8');
-    return text.length > PREVIEW_MAX_CHARS
-      ? `${text.slice(0, PREVIEW_MAX_CHARS)}...`
-      : text;
-  }
-
   reset(): void {
     this.buffer = Buffer.alloc(0);
   }
@@ -79,6 +70,15 @@ const DEVICE_MANAGEMENT_CONTAINER_KEYS = [
   'Parameters',
   'GetParameters',
 ] as const;
+
+// A device answered, but not with a register map under any container key
+// the cascade below knows. Distinct from no answer at all, because which
+// keys it did send is exactly what a diagnostics dump needs to show.
+export class ResponseShapeError extends Error {
+  constructor(readonly keys: string[]) {
+    super(`unexpected response shape, keys=[${keys.join(', ')}]`);
+  }
+}
 
 // Container-key cascade: firmware is inconsistent about which key wraps the
 // register dict, and DeviceManagement has been observed under ControlInfo on

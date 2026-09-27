@@ -16,7 +16,7 @@ import {
 } from '../protocol/registers';
 import type { DeviceIdentity } from '../types';
 import type { Logger } from '../logger';
-import { silentLogger } from '../logger';
+import { describeError, silentLogger } from '../logger';
 import {
   AeccConnection,
   type SocketFactory,
@@ -47,7 +47,6 @@ class ReadTimeoutError extends Error {}
 class ProtocolError extends Error {
   constructor(
     message: string,
-    readonly preview: string = '',
     readonly byteLength: number = 0
   ) {
     super(message);
@@ -73,8 +72,30 @@ function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-function describeError(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
+/**
+ * Thins out the error lines of one outage. A battery that is off for a day
+ * fails every poll, and logging each one would fill the app log that Homey's
+ * diagnostic report carries until the report is too large to send. Logging
+ * failures 1, 2, 4, 8 and so on keeps the start of an outage in full and
+ * still shows it is ongoing: a day-long outage at a 5 second poll logs 15
+ * failures, a few dozen lines once a connection error's reconnect line is
+ * counted.
+ */
+export class OutageLog {
+  private failures = 0;
+
+  // Counts one failure and says whether this one should be logged.
+  noteFailure(): boolean {
+    this.failures += 1;
+    return (this.failures & (this.failures - 1)) === 0;
+  }
+
+  // Ends the outage and returns how many failures it had, 0 if none.
+  noteSuccess(): number {
+    const failures = this.failures;
+    this.failures = 0;
+    return failures;
+  }
 }
 
 function normalizeField(raw: string | undefined): string | undefined {
@@ -92,6 +113,7 @@ export class AeccClient {
   private readonly deviceManagementTimeoutMs: number;
   private readonly logger: Logger;
   private readonly queue = new RequestQueue();
+  private readonly outageLog = new OutageLog();
 
   private serial = 0;
   private readTimeoutStreak = 0;
@@ -239,6 +261,12 @@ export class AeccClient {
       const response = await this.writeAndRead(socket, payload, timeoutMs);
       this.connection.backoff.noteSuccess();
       this.readTimeoutStreak = 0;
+      const failedRequests = this.outageLog.noteSuccess();
+      if (failedRequests > 0) {
+        this.logger.log(
+          `${op} ${command}: device answering again after ${failedRequests} failed request(s)`
+        );
+      }
       return response;
     } catch (err) {
       // A teardown that lands mid-request is why this request failed, so it
@@ -250,16 +278,15 @@ export class AeccClient {
         return null;
       }
       if (err instanceof ProtocolError) {
-        // A DeviceManagement body never reaches the log. The safe register
-        // list already keeps WiFi credentials out of the response, but the
-        // body stays out regardless so widening that list cannot leak them.
-        const detail =
-          command === 'DeviceManagement'
-            ? `${err.byteLength} bytes`
-            : `${err.byteLength} bytes: ${err.preview}`;
-        this.logger.error(
-          `${op} ${command} protocol error: ${err.message} (${detail})`
-        );
+        // Never the body itself: this log reaches diagnostic reports, a
+        // DeviceManagement body can hold WiFi credentials and an
+        // EnergyParameter body unit serials. The JSON type and size are
+        // enough to tell what went wrong.
+        if (this.outageLog.noteFailure()) {
+          this.logger.error(
+            `${op} ${command} protocol error: ${err.message} (${err.byteLength} bytes)`
+          );
+        }
         return null;
       }
       await this.handleConnectionError(op, command, err);
@@ -308,8 +335,7 @@ export class AeccClient {
         } else {
           finishReject(
             new ProtocolError(
-              'response was not a JSON object',
-              acc.preview,
+              `response was a JSON ${Array.isArray(parsed) ? 'array' : parsed === null ? 'null' : typeof parsed}, not an object`,
               acc.byteLength
             )
           );
@@ -334,9 +360,11 @@ export class AeccClient {
 
   private async handleReadTimeout(op: string, command: string): Promise<void> {
     this.readTimeoutStreak += 1;
-    this.logger.error(
-      `${op} ${command}: read timeout (streak ${this.readTimeoutStreak})`
-    );
+    if (this.outageLog.noteFailure()) {
+      this.logger.error(
+        `${op} ${command}: read timeout (streak ${this.readTimeoutStreak})`
+      );
+    }
     if (this.readTimeoutStreak >= READ_TIMEOUT_STREAK_LIMIT) {
       await this.connection.close();
       this.readTimeoutStreak = 0;
@@ -349,18 +377,23 @@ export class AeccClient {
     err: unknown
   ): Promise<void> {
     const cooldownMs = this.connection.backoff.currentCooldownMs();
-    this.logger.error(
-      `${op} ${command} connection error: ${describeError(err)}, reconnecting after ${cooldownMs}ms`
-    );
+    const logThis = this.outageLog.noteFailure();
+    if (logThis) {
+      this.logger.error(
+        `${op} ${command} connection error: ${describeError(err)}, reconnecting after ${cooldownMs}ms`
+      );
+    }
     this.connection.backoff.noteFailure();
     await sleep(cooldownMs);
     try {
       await this.connection.close();
       await this.connection.connect();
     } catch (reconnectErr) {
-      this.logger.error(
-        `${op} ${command} reconnect failed: ${describeError(reconnectErr)}`
-      );
+      if (logThis) {
+        this.logger.error(
+          `${op} ${command} reconnect failed: ${describeError(reconnectErr)}`
+        );
+      }
     }
   }
 }

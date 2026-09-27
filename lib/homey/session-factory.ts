@@ -1,3 +1,4 @@
+import type { Logger } from '../logger';
 import type { AeccSessionOptions, Scheduler } from '../session';
 import type { AeccDeviceSettings } from './device-settings';
 
@@ -11,11 +12,14 @@ import type { AeccDeviceSettings } from './device-settings';
  * rather than being spelled out twice.
  *
  * The scheduler is passed in: it is the one piece that is genuinely per
- * device, since it wraps that device's own homey.setTimeout.
+ * device, since it wraps that device's own homey.setTimeout. So is the
+ * logger: without it every transport error went to a silent logger, and
+ * never reached the app log that a diagnostic report carries.
  */
 export function sessionOptionsFrom(
   settings: AeccDeviceSettings,
-  scheduler: Scheduler
+  scheduler: Scheduler,
+  logger: Logger
 ): AeccSessionOptions {
   return {
     host: settings.host,
@@ -26,6 +30,7 @@ export function sessionOptionsFrom(
       maxDischargeW: settings.maxDischargePowerW,
     },
     scheduler,
+    logger,
     pollIntervalMs: settings.pollIntervalS * 1000,
     verifyIntervalMs: settings.verifyIntervalS * 1000,
   };

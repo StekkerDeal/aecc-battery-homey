@@ -99,7 +99,7 @@ export default class AeccPvDevice extends Homey.Device implements PvFollower {
 
   private async detachNow(): Promise<void> {
     if (!this.lease.held) return;
-    this.log(`Detaching from ${this.lease.key}`);
+    this.log("Detaching from the battery's session");
     await this.persistMeter();
     await this.lease.release();
     // Availability follows the session: with no session this device has no
@@ -155,8 +155,8 @@ export default class AeccPvDevice extends Homey.Device implements PvFollower {
     const { session, created } = await this.lease.acquire(settings);
     this.log(
       created
-        ? `Attached to ${this.lease.key}, which this device started`
-        : `Attached to ${this.lease.key}, sharing the battery's session`
+        ? "Attached to the battery's session, which this device started"
+        : "Attached to the battery's session, sharing it with the battery"
     );
 
     // subscribe() has no replay, so a device joining a session that is
@@ -187,7 +187,12 @@ export default class AeccPvDevice extends Homey.Device implements PvFollower {
   // the uncommon case: normally the battery device has already created the
   // session and this one joins it.
   private createSession(settings: AeccDeviceSettings): AeccSession {
-    return new AeccSession(sessionOptionsFrom(settings, this.scheduler()));
+    return new AeccSession(
+      sessionOptionsFrom(settings, this.scheduler(), {
+        log: (...args) => this.log(...args),
+        error: (...args) => this.error(...args),
+      })
+    );
   }
 
   private noDataMessage(): string {

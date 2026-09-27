@@ -32,6 +32,12 @@ import {
   type RawSettings,
 } from '../../lib/homey/device-settings';
 import { planEmsCommand } from '../../lib/homey/ems-command';
+import { describeError } from '../../lib/logger';
+import {
+  buildDiagnostics,
+  formatDiagnosticsLine,
+  readControlRegistersSection,
+} from '../../lib/diagnostics';
 import { followersOf } from '../../lib/homey/pv-link';
 
 interface OnSettingsEvent {
@@ -61,6 +67,11 @@ const REMOVED_CAPABILITY_IDS: readonly string[] = [
   'measure_power.pv1',
   'measure_power.pv2',
 ];
+
+// Capabilities added to the driver after release. A device keeps the
+// capability list it was paired with, so these are added on init to
+// devices paired before them.
+const ADDED_CAPABILITY_IDS: readonly string[] = ['button.diagnostics'];
 
 export default class AeccDevice extends Homey.Device implements AeccFlowDevice {
   private lease!: SessionLease;
@@ -106,6 +117,7 @@ export default class AeccDevice extends Homey.Device implements AeccFlowDevice {
     }
 
     await this.dropRemovedCapabilities();
+    await this.addNewCapabilities();
 
     this.currentOptionalCapabilities = new Set(
       this.getCapabilities().filter(id => OPTIONAL_CAPABILITY_IDS.includes(id))
@@ -139,6 +151,42 @@ export default class AeccDevice extends Homey.Device implements AeccFlowDevice {
       await this.setCapabilityValue('meter_power.charged', 0);
       await this.setCapabilityValue('meter_power.discharged', 0);
     });
+
+    this.registerCapabilityListener('button.diagnostics', () =>
+      this.writeDiagnostics()
+    );
+  }
+
+  // One line in the app log, in the Home Assistant integration's diagnostics
+  // format, which Homey's "Send diagnostic report" then carries to us.
+  private async writeDiagnostics(): Promise<void> {
+    const session = this.lease.session;
+    if (session === null) {
+      throw new Error(
+        this.homey.__({
+          en: 'Not connected to the battery right now, so there is nothing to write.',
+          nl: 'Er is nu geen verbinding met de batterij, dus er valt niets te schrijven.',
+        })
+      );
+    }
+    const settings = settingsFrom(this.getSettings() as RawSettings);
+    const controlRegisters = await readControlRegistersSection(
+      addresses => session.readControlRegisters(addresses),
+      () => Date.now()
+    );
+    const snapshot = session.snapshot;
+    const dump = buildDiagnostics({
+      homeyVersion: this.homey.version ?? null,
+      appVersion: (this.homey.manifest?.version as string | undefined) ?? null,
+      brand: snapshot.brand,
+      host: settings.host,
+      port: settings.port,
+      snapshot,
+      state: session.diagnosticsState,
+      writeHistory: session.writeHistory,
+      controlRegisters,
+    });
+    this.log(formatDiagnosticsLine(dump));
   }
 
   // The session this device currently holds. Throws rather than handing a
@@ -193,7 +241,7 @@ export default class AeccDevice extends Homey.Device implements AeccFlowDevice {
       const devices = this.homey.drivers.getDriver('pv').getDevices();
       return followersOf(devices, this.getData().id);
     } catch (error) {
-      this.error('Could not look up PV devices', error);
+      this.error('Could not look up PV devices:', describeError(error));
       return [];
     }
   }
@@ -209,7 +257,7 @@ export default class AeccDevice extends Homey.Device implements AeccFlowDevice {
       try {
         await follower.detachFromBattery();
       } catch (error) {
-        this.error('A PV device failed to detach', error);
+        this.error('A PV device failed to detach:', describeError(error));
       }
     }
   }
@@ -220,14 +268,14 @@ export default class AeccDevice extends Homey.Device implements AeccFlowDevice {
     const followers = this.pvFollowers();
     if (followers.length > 0 && settings !== undefined) {
       this.log(
-        `Reattaching ${followers.length} PV device(s) to ${settings.host}:${settings.port}`
+        `Reattaching ${followers.length} PV device(s) to the battery session`
       );
     }
     for (const follower of followers) {
       try {
         await follower.attachToBattery(settings);
       } catch (error) {
-        this.error('A PV device failed to reattach', error);
+        this.error('A PV device failed to reattach:', describeError(error));
       }
     }
   }
@@ -354,12 +402,12 @@ export default class AeccDevice extends Homey.Device implements AeccFlowDevice {
   // --- setup helpers --------------------------------------------------------
 
   private createSession(settings: AeccDeviceSettings): AeccSession {
-    const scheduler: Scheduler = {
-      setTimeout: (handler, ms) => this.homey.setTimeout(handler, ms),
-      clearTimeout: handle => this.homey.clearTimeout(handle),
-      now: () => Date.now(),
-    };
-    return new AeccSession(sessionOptionsFrom(settings, scheduler));
+    return new AeccSession(
+      sessionOptionsFrom(settings, this.scheduler(), {
+        log: (...args) => this.log(...args),
+        error: (...args) => this.error(...args),
+      })
+    );
   }
 
   private restoreMeter(): void {
@@ -582,6 +630,17 @@ export default class AeccDevice extends Homey.Device implements AeccFlowDevice {
         await this.removeCapability(id);
       } catch (error) {
         this.error(`Could not remove the retired capability ${id}`, error);
+      }
+    }
+  }
+
+  private async addNewCapabilities(): Promise<void> {
+    for (const id of ADDED_CAPABILITY_IDS) {
+      if (this.hasCapability(id)) continue;
+      try {
+        await this.addCapability(id);
+      } catch (error) {
+        this.error(`Could not add the capability ${id}`, error);
       }
     }
   }

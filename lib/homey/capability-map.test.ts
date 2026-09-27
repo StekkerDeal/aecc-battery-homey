@@ -51,7 +51,12 @@ function makeSnapshot(
     consecutiveFailedPolls: 0,
     lastPollAtMs: 1_000,
     lastGoodPollAtMs: 1_000,
-    frameGuard: { suspectFramesTotal: 0, lastReason: null, lastAt: null },
+    frameGuard: {
+      suspectStreak: 0,
+      suspectFramesTotal: 0,
+      lastReason: null,
+      lastAt: null,
+    },
     ...overrides,
   };
 }

@@ -81,19 +81,6 @@ describe('JsonAccumulator', () => {
     expect(acc.byteLength).toBe(7);
   });
 
-  it('truncates preview for logging beyond 200 chars', () => {
-    const acc = new JsonAccumulator();
-    acc.push(Buffer.from('{"a":"' + 'x'.repeat(300) + '"'));
-    expect(acc.preview.length).toBe(203);
-    expect(acc.preview.endsWith('...')).toBe(true);
-  });
-
-  it('does not truncate a short preview', () => {
-    const acc = new JsonAccumulator();
-    acc.push(Buffer.from('{"a":1}'));
-    expect(acc.preview).toBe('{"a":1}');
-  });
-
   it('reset clears accumulated bytes', () => {
     const acc = new JsonAccumulator();
     acc.push(Buffer.from('{"a":1}'));

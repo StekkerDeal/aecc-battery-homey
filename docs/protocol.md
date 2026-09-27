@@ -163,7 +163,9 @@ the inconsistency does not follow a simple per-field or per-device rule:
   `PvChargingPower`, `AcInActivePower`) are in **deciwatts** (divide by 10 to
   get watts).
 - `Pv1Power` and `Pv2Power` inside the same `Storage_list` entry are already
-  in **watts**, not deciwatts, despite living next to fields that are.
+  in **watts**, not deciwatts, despite living next to fields that are
+  (confirmed on a Sunpura S2400, where the two sum exactly to `TotalPVPower`;
+  see the PV section below).
 - The system-wide `SSumInfoList` summary fields (`TotalACChargePower`,
   `TotalBatteryOutputPower`, `TotalPVPower`, `MeterTotalActivePower`) are
   generally already in watts, **except** `TotalBackUpPower`, which is in
@@ -193,19 +195,23 @@ screenshot from the same device showed `352` alongside `TotalPVChargePower:
 265` ([aecc-battery-local#20](https://github.com/StekkerDeal/aecc-battery-local/issues/20)).
 This is the one PV field with a real reading behind it.
 
-**`Pv1Power` to `Pv4Power` appear not to be populated by this firmware
-family.** They read 0 in every capture across six brands, including the
-458W one above and a device advertising `PvStringCount: 4`. The same owner
-confirmed the vendor app shows no per-string values anywhere and the
-manufacturer's own Home Assistant integration exposes none either. Their
-scale therefore remains unverified, since no non-zero reading exists: the
-note above grouping `Pv1Power` and `Pv2Power` with the watt-scale fields
-rests on inference, not measurement. `Pv3Power` and `Pv4Power` are not
-mapped by either integration.
+**`Pv1Power` and `Pv2Power` are filled on some models and not on others.**
+A Sunpura S2400 with panels on both inputs filled them: three weeks of Home
+Assistant statistics (April 2026) show string 1 peaking at 694W and string 2
+at 609W against a `TotalPVPower` peak of 944W, and in every one of 122
+generating hours the hourly mean of the two strings equals the hourly mean of
+`TotalPVPower`. Read at scale 1.0, that settles them as plain watts. A JET
+GreenARK Pro with panels connected generated up to 1204W over the same kind
+of period with both string fields at 0 throughout, and the Oscal 458W capture
+above and a device advertising `PvStringCount: 4` read 0 as well; that Oscal
+owner also confirmed the vendor app shows no per-string values. So a 0 here
+means either no sun or a model that does not report strings, and nothing
+over the protocol tells the two apart. `Pv3Power` and `Pv4Power` have never
+been seen non-zero and are not mapped by either integration.
 
 **`PvStringCount` is not a reliable presence signal.** It contradicts itself
 across captures: an AEG Solarcube stack reports `4` on the master and `0` on
-the slave (same model, same firmware), a JET with no panels reports `0` and
+the slave (same model, same firmware), a JET with panels connected reports `0` and
 declares four string fields anyway, and the AFERIY reports `0` on both units
 while its summary reports 758W. It cannot currently be used to decide
 whether a battery has PV hardware, nor how many strings it has.
@@ -214,10 +220,10 @@ The practical consequence: a battery with no panels and a battery at night
 are indistinguishable over this protocol. The Homey app therefore asks the
 owner to confirm that panels exist rather than detecting it. It integrates
 the summary total only, and carries `Pv1Power` and `Pv2Power` through as
-display-only readings when the model reports them, so a firmware that does
-fill them is not thrown away. They are kept out of the energy total on
-purpose: their scale rests on no non-zero observation, so a wrong one
-cannot corrupt a kWh counter.
+display-only readings when the model reports them, so a firmware that fills
+them is not thrown away. They are kept out of the energy total on purpose:
+where they are filled they sum to `TotalPVPower`, so adding them would count
+the same energy twice.
 
 ## Security: DeviceManagement exposes credentials
 

@@ -7,6 +7,7 @@ import {
   type SessionSnapshot,
 } from '../../lib/session';
 import { SessionRegistry } from '../../lib/session-registry';
+import { silentLogger } from '../../lib/logger';
 import { sessionOptionsFrom } from '../../lib/homey/session-factory';
 import { SessionLease } from '../../lib/homey/session-lease';
 import { ProductionIntegrator } from '../../lib/protocol/energy-meter';
@@ -67,7 +68,7 @@ function deviceSide(reg: SessionRegistry): LeaseSide {
     jitterMs: () => 0,
     createSession: settings =>
       new AeccSession({
-        ...sessionOptionsFrom(settings, systemScheduler),
+        ...sessionOptionsFrom(settings, systemScheduler, silentLogger),
         ...FAST_OPTS,
       }),
     onEvent: (event: SessionEvent) => {

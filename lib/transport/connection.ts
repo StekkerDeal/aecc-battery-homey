@@ -102,11 +102,7 @@ export class AeccConnection {
         socket.off('connect', onConnect);
         socket.off('error', onError);
         socket.destroy();
-        reject(
-          new Error(
-            `connect timeout after ${this.connectTimeoutMs}ms to ${this.host}:${this.port}`
-          )
-        );
+        reject(new Error(`connect timeout after ${this.connectTimeoutMs}ms`));
       }, this.connectTimeoutMs);
 
       socket.once('connect', onConnect);
