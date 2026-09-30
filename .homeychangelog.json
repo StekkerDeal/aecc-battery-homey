@@ -24,6 +24,7 @@
     "nl": "Opgelost: het batterijvermogen telt nu ook laden direct vanaf panelen op de batterij mee, zodat Homey Energie die zonne-energie niet meer dubbel telt. Zitten er panelen op je batterij, voeg dan het apparaat AECC PV-ingang toe. Het ontladen totaal telt nu precies wat er bij je huis aankomt."
   },
   "1.2.3": {
-    "en": "Fixed: a device plugged into the battery's backup socket no longer shows up as the battery charging."
+    "en": "Fixed: a device plugged into the battery's backup socket no longer shows up as the battery charging.",
+    "nl": "Opgelost: een apparaat in het noodstroomstopcontact van de batterij telt niet langer als laden van de batterij."
   }
 }
