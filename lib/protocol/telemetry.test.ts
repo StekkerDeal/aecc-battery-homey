@@ -9,6 +9,12 @@ import {
   unitKey,
   wallPowerSignalW,
 } from './telemetry';
+import aegTwoUnit from '../../test/fixtures/aeg-two-unit.json';
+import jetSingleUnit from '../../test/fixtures/jet-single-unit.json';
+import pvGenerating from '../../test/fixtures/pv-generating.json';
+import sunpuraPvAndAc from '../../test/fixtures/sunpura-pv-and-ac.json';
+import sunpuraPvOnly from '../../test/fixtures/sunpura-pv-only.json';
+import tsunDischarging from '../../test/fixtures/tsun-discharging.json';
 
 const jetUnit: StorageUnit = {
   DevAddr: 1,
@@ -109,14 +115,6 @@ describe('systemValue: field map scale conventions', () => {
       SSumInfoList: { Pv1Power: 9999 },
     };
     expect(systemValue(frame, 'pv1_power')).toBe(340);
-  });
-
-  it('never reads TotalChargePower for battery_charging_power', () => {
-    const frame: EnergyFrame = {
-      Storage_list: [{ BatteryChargingPower: 50 }],
-      SSumInfoList: { TotalChargePower: 9999 },
-    };
-    expect(systemValue(frame, 'battery_charging_power')).toBe(5);
   });
 
   it('averages battery_soc across units instead of summing', () => {
@@ -256,39 +254,64 @@ describe('summaryPvPowerW', () => {
 });
 
 describe('derive', () => {
-  it('computes measurePowerW as max(charge, acCharge) - discharge, positive = charging', () => {
-    const frame: EnergyFrame = {
-      Storage_list: [
-        {
-          BatteryChargingPower: 1000,
-          AcChargingPower: 5000,
-          BatteryDischargingPower: 0,
-        },
-      ],
-    };
-    const result = derive(frame, 55);
-    expect(result.measurePowerW).toBe(500);
-    expect(result.chargingState).toBe('charging');
-    expect(result.socPct).toBe(55);
+  // Real captures, except the hand-built AEG pair. The S2400 pair is the #14
+  // case: panels charging the cells with every per-unit charge field at 0.
+  it.each([
+    ['S2400 on panels only', sunpuraPvOnly, 190, 'charging'],
+    ['S2400 on panels and grid', sunpuraPvAndAc, 450, 'charging'],
+    ['AFERIY on panels', pvGenerating, 478, 'charging'],
+    ['JET on AC', jetSingleUnit, 798, 'charging'],
+    ['AEG two units on AC', aegTwoUnit, 800, 'charging'],
+    ['TSUN discharging', tsunDischarging, -547, 'discharging'],
+  ] as const)(
+    'computes battery power as PV minus socket output: %s',
+    (_name, fixture, watts, state) => {
+      const result = derive(fixture.last_poll as unknown as EnergyFrame, 50);
+      expect(result.measurePowerW).toBe(watts);
+      expect(result.chargingState).toBe(state);
+    }
+  );
+
+  // TotalChargePower is the cell side, after losses, so the balance is never
+  // below it while charging.
+  it.each([
+    ['S2400 on panels only', sunpuraPvOnly],
+    ['S2400 on panels and grid', sunpuraPvAndAc],
+    ['AFERIY on panels', pvGenerating],
+    ['JET on AC', jetSingleUnit],
+  ] as const)('is at least TotalChargePower while charging: %s', (_n, f) => {
+    const frame = f.last_poll as unknown as EnergyFrame;
+    const cellSideW = Number(frame.SSumInfoList?.TotalChargePower);
+    expect(cellSideW).toBeGreaterThan(0);
+    expect(derive(frame, 50).measurePowerW).toBeGreaterThanOrEqual(cellSideW);
   });
 
-  it('reports discharging when the discharge signal dominates', () => {
+  it('ignores TotalChargePower', () => {
     const frame: EnergyFrame = {
-      Storage_list: [
-        {
-          BatteryChargingPower: 0,
-          AcChargingPower: 0,
-          BatteryDischargingPower: 8000,
-        },
-      ],
+      SSumInfoList: { TotalGridOutputPower: -300, TotalChargePower: 9999 },
     };
-    const result = derive(frame, 40);
-    expect(result.measurePowerW).toBe(-800);
-    expect(result.chargingState).toBe('discharging');
+    expect(derive(frame, 50).measurePowerW).toBe(300);
   });
 
-  it('reports idle when there is a power signal but it nets to zero', () => {
-    const frame: EnergyFrame = { SSumInfoList: { TotalACChargePower: 0 } };
+  it('counts a missing TotalPVPower as no panels', () => {
+    const frame: EnergyFrame = { SSumInfoList: { TotalGridOutputPower: 400 } };
+    expect(derive(frame, 50).measurePowerW).toBe(-400);
+  });
+
+  it('has no battery power without TotalGridOutputPower', () => {
+    const frame: EnergyFrame = {
+      Storage_list: [{ AcChargingPower: 5000, BatteryChargingPower: 1000 }],
+      SSumInfoList: { TotalPVPower: 200, TotalACChargePower: 500 },
+    };
+    const result = derive(frame, 50);
+    expect(result.measurePowerW).toBeNull();
+    expect(result.chargingState).toBeNull();
+  });
+
+  it('reports idle when the balance nets to zero', () => {
+    const frame: EnergyFrame = {
+      SSumInfoList: { TotalPVPower: 300, TotalGridOutputPower: 300 },
+    };
     const result = derive(frame, 50);
     expect(result.measurePowerW).toBe(0);
     expect(result.chargingState).toBe('idle');
@@ -298,30 +321,14 @@ describe('derive', () => {
   // charging and -5W discharging on the JET, so an exact-zero test would have
   // left the tile permanently reading charging or discharging.
   it('calls standby draw inside the deadband idle without hiding it from measure_power', () => {
-    const frame: EnergyFrame = {
-      Storage_list: [
-        {
-          BatteryChargingPower: 100,
-          AcChargingPower: 0,
-          BatteryDischargingPower: 0,
-        },
-      ],
-    };
+    const frame: EnergyFrame = { SSumInfoList: { TotalGridOutputPower: -10 } };
     const result = derive(frame, 50);
     expect(result.measurePowerW).toBe(10);
     expect(result.chargingState).toBe('idle');
   });
 
   it('calls standby discharge inside the deadband idle', () => {
-    const frame: EnergyFrame = {
-      Storage_list: [
-        {
-          BatteryChargingPower: 0,
-          AcChargingPower: 0,
-          BatteryDischargingPower: 50,
-        },
-      ],
-    };
+    const frame: EnergyFrame = { SSumInfoList: { TotalGridOutputPower: 5 } };
     const result = derive(frame, 50);
     expect(result.measurePowerW).toBe(-5);
     expect(result.chargingState).toBe('idle');
@@ -329,30 +336,14 @@ describe('derive', () => {
 
   it('reports charging and discharging just outside the deadband', () => {
     const charging = derive(
-      {
-        Storage_list: [
-          {
-            BatteryChargingPower: 260,
-            AcChargingPower: 0,
-            BatteryDischargingPower: 0,
-          },
-        ],
-      },
+      { SSumInfoList: { TotalGridOutputPower: -26 } },
       50
     );
     expect(charging.measurePowerW).toBe(26);
     expect(charging.chargingState).toBe('charging');
 
     const discharging = derive(
-      {
-        Storage_list: [
-          {
-            BatteryChargingPower: 0,
-            AcChargingPower: 0,
-            BatteryDischargingPower: 260,
-          },
-        ],
-      },
+      { SSumInfoList: { TotalGridOutputPower: 26 } },
       50
     );
     expect(discharging.measurePowerW).toBe(-26);

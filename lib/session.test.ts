@@ -44,6 +44,8 @@ class FakeDeviceSocket extends EventEmitter implements SocketLike {
       AverageBatteryAverageSOC: 50,
       TotalACChargePower: 0,
       TotalBatteryOutputPower: 0,
+      TotalPVPower: 0,
+      TotalGridOutputPower: 0,
     },
   };
   responseDelayMs = 0;

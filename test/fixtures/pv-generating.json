@@ -1,8 +1,8 @@
 {
-  "_note": "SYNTHETIC, not a capture. No diagnostics dump in this project or in the Home Assistant integration has ever recorded a battery generating PV, so this frame is hand built to the shape the closest real capture showed: an AFERIY PS240 reporting SSumInfoList.TotalPVPower 758 while every Storage_list entry reported PvChargingPower 0 and Pv1Power..Pv4Power 0. That combination is the reason the solar device reads the summary field only: a fallback to the per-unit PvChargingPower would report this generating array as producing nothing. Only last_poll is defined here; tests compose it onto the registers of jet-single-unit.json, so the control register set stays single sourced and cannot drift from the real one. Replace this file with a real capture once one exists.",
+  "_note": "last_poll from a real AFERIY PS240 two-unit Home Assistant diagnostics export (aecc-battery-local #2), serials redacted. Panels generating: SSumInfoList.TotalPVPower 758 while every Storage_list entry reports PvChargingPower 0, which is why the solar device reads the summary field only. Only last_poll is defined here; tests compose it onto the registers of jet-single-unit.json, so the control register set stays single sourced.",
   "last_poll": {
     "Response": "EnergyParameter",
-    "SerialNumber": 123097,
+    "SerialNumber": 467,
     "Target": "HA",
     "Storage_list": [
       {
@@ -11,9 +11,26 @@
         "StorageStatus": 1,
         "PvChargingPower": 0,
         "AcChargingPower": 0,
-        "BatterySoc": 64,
+        "BatterySoc": 94,
         "BatteryDischargingPower": 0,
-        "AcInActivePower": 0,
+        "AcInActivePower": 1700,
+        "OffGridLoadPower": 0,
+        "BatteryChargingPower": 0,
+        "PvStringCount": 0,
+        "Pv1Power": 0,
+        "Pv2Power": 0,
+        "Pv3Power": 0,
+        "Pv4Power": 0
+      },
+      {
+        "DevAddr": 2,
+        "StorageSN": "SIMSN0000000002",
+        "StorageStatus": 1,
+        "PvChargingPower": 0,
+        "AcChargingPower": 0,
+        "BatterySoc": 94,
+        "BatteryDischargingPower": 0,
+        "AcInActivePower": 1100,
         "OffGridLoadPower": 0,
         "BatteryChargingPower": 0,
         "PvStringCount": 0,
@@ -30,11 +47,11 @@
       "TotalPVChargePower": 0,
       "TotalACChargePower": 0,
       "TotalSmartLoadElectricalPower": 0,
-      "AverageBatteryAverageSOC": 64,
+      "AverageBatteryAverageSOC": 94,
       "TotalBatteryOutputPower": 0,
       "TotalGridOutputPower": 280,
       "TotalBackUpPower": 0,
-      "TotalChargePower": 0
+      "TotalChargePower": 401
     }
   }
 }

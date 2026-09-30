@@ -29,10 +29,10 @@ Homey-specific testing so far covers the JET GreenARK Pro, this app's developmen
 
 The app pairs two kinds of device, both from one battery:
 
-| Device                | Class        | What it is                                                                                                                            |
-| --------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------- |
-| **AECC home battery** | `battery`    | The main device: state of charge, power, energy totals and all control. Everything in this readme is about it unless stated otherwise |
-| **AECC PV input**     | `solarpanel` | Optional. The PV generation of a battery you have already added, so it reaches the Homey Energy tab as production                     |
+| Device                | Class        | What it is                                                                                                                                             |
+| --------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **AECC home battery** | `battery`    | The main device: state of charge, power, energy totals and all control. Everything in this readme is about it unless stated otherwise                  |
+| **AECC PV input**     | `solarpanel` | The PV generation of a battery you have already added, so it reaches the Homey Energy tab as production. Add it if panels are connected to the battery |
 
 The PV device does not open a connection of its own. It joins the session its battery already runs, because the hardware serves one TCP connection at a time. It is paired by picking the battery it belongs to rather than by entering an address, so a repair or an IP change on the battery carries over automatically, and it never sends a command: all control stays with the battery device.
 
@@ -66,7 +66,7 @@ For development or pre-release builds, see [`docs/development.md`](docs/developm
 
 | Capability                       | Unit | Notes                                                                                                                                                                                     |
 | -------------------------------- | ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `measure_power`                  | W    | Signed: positive = charging, negative = discharging                                                                                                                                       |
+| `measure_power`                  | W    | Signed: positive = charging, negative = discharging. PV plus socket input, minus socket output, so charging straight from panels counts too                                               |
 | `measure_battery`                | %    | State of charge                                                                                                                                                                           |
 | `battery_charging_state`         | -    | Homey's standard charging-state enum (`charging` / `discharging` / `idle`), derived from `measure_power` with a 25W deadband, so the standby draw of a stopped battery still reads `idle` |
 | `meter_power.charged`            | kWh  | Locally integrated charged energy total. See Energy totals below                                                                                                                          |
@@ -100,7 +100,7 @@ Depending on what your model reports, the battery device also adds `measure_powe
 
 `meter_power` on the PV device is integrated from `SSumInfoList.TotalPVPower`, the battery's own summary of PV generation, and from nothing else. In particular it does not fall back to the per-unit `PvChargingPower`, which is PV going **into the battery** rather than PV coming off the panels, and which read 0 in a capture where the summary reported 758W. The consequence is that a model which does not report the summary field reads as no data rather than as no sun, and that this total will not match a figure derived from the charging-side field elsewhere.
 
-`meter_power.charged` and `meter_power.discharged` are integrated locally by this app from the live `measure_power` signal, because the local protocol exposes no cumulative energy counters at all. They will **not** exactly match the equivalent sensors in the Home Assistant integration, which integrates a different pair of signals from the same battery. This is a deliberate choice, not a bug: integrating the one signed power value this app already polls keeps the Homey Energy animation and these two meters internally consistent with each other, at the cost of them drifting slightly from a differently-computed total elsewhere.
+`meter_power.charged` and `meter_power.discharged` are integrated locally from `measure_power`, because the local protocol exposes no cumulative energy counters. Charged includes PV going straight into the battery; discharged counts what the battery itself delivers, not PV passing straight through to the house.
 
 ## Control
 
@@ -179,9 +179,6 @@ Check the "On Grid Output" setting in the vendor app (Operating Mode Settings). 
 
 **Multi-unit stack shows only combined totals, and the second unit ignores the setpoint**
 Expected, see Multi-unit / master-slave stacks above.
-
-**Energy totals do not match the Home Assistant integration for the same battery**
-Expected, see Energy totals above.
 
 **My PV device reads 0 W all day**
 Either no panels are connected to that battery, or the model does not report the PV summary field. A device that reports nothing at all shows an empty `measure_power` rather than 0, so a steady 0 means the battery is reporting no generation.

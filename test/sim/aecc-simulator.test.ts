@@ -11,9 +11,10 @@ import {
   encodeRequest,
   JsonAccumulator,
 } from '../../lib/protocol/frames';
-import { systemValue } from '../../lib/protocol/telemetry';
+import { derive, systemValue } from '../../lib/protocol/telemetry';
 import type { EnergyFrame } from '../../lib/types';
 import jetSingleUnit from '../fixtures/jet-single-unit.json';
+import sunpuraPvOnly from '../fixtures/sunpura-pv-only.json';
 
 const NO_RESPONSE = Symbol('no-response');
 
@@ -349,6 +350,7 @@ describe('setSoc / setPower / injectRawFrame', () => {
     expect(
       (response.SSumInfoList as Record<string, number>).TotalACChargePower
     ).toBe(1200);
+    expect(derive(response, null).measurePowerW).toBe(1200);
   });
 
   it('setPower keeps Storage_list and SSumInfoList consistent through systemValue when discharging', async () => {
@@ -367,6 +369,21 @@ describe('setSoc / setPower / injectRawFrame', () => {
     expect(
       (response.SSumInfoList as Record<string, number>).TotalBatteryOutputPower
     ).toBe(500);
+    expect(derive(response, null).measurePowerW).toBe(-500);
+  });
+
+  it('setPower drives the derived battery power on a scenario with PV', async () => {
+    const running = await startSim({
+      scenario: sunpuraPvOnly as unknown as Scenario,
+    });
+    running.setPower(-300);
+    const client = await connect(running.port);
+
+    const response = (await client.request(
+      buildGet('EnergyParameter', 1)
+    )) as EnergyFrame & Record<string, unknown>;
+
+    expect(derive(response, null).measurePowerW).toBe(-300);
   });
 
   it('injectRawFrame overrides exactly the next poll, then reverts', async () => {

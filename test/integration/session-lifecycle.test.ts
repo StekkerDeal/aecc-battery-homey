@@ -42,7 +42,7 @@ describe('AeccSession full lifecycle', () => {
     await session.start();
 
     const snap = session.snapshot;
-    // JET fixture: BatterySoc 28, TotalACChargePower 798W (charging).
+    // JET fixture: BatterySoc 28, TotalGridOutputPower -798W (charging).
     expect(snap.telemetry?.socPct).toBe(28);
     expect(snap.telemetry?.measurePowerW).toBe(798);
     expect(snap.telemetry?.chargingState).toBe('charging');

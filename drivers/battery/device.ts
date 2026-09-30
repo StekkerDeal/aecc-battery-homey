@@ -83,11 +83,9 @@ export default class AeccDevice extends Homey.Device implements AeccFlowDevice {
   private lastPersistedDischargedKwh = 0;
   private lastPersistedAtMs = 0;
 
-  // Cached off the latest snapshot, used by isFresh() and by the drift
-  // trigger's tokens without waiting on another session round-trip.
+  // Cached off the latest snapshot, used by isFresh() and the stale trigger's
+  // seconds token without waiting on another session round-trip.
   private lastGoodPollAtMs: number | null = null;
-  private lastCommandedTargetPowerW = 0;
-  private lastMeasuredPowerW: number | null = null;
 
   async onInit(): Promise<void> {
     const settings = settingsFrom(this.getSettings() as RawSettings);
@@ -520,10 +518,6 @@ export default class AeccDevice extends Homey.Device implements AeccFlowDevice {
     }
 
     this.lastGoodPollAtMs = snapshot.lastGoodPollAtMs;
-    this.lastCommandedTargetPowerW = snapshot.commandedTargetPowerW;
-    if (snapshot.telemetry) {
-      this.lastMeasuredPowerW = snapshot.telemetry.measurePowerW;
-    }
 
     // Absent readings are null, never 0: skip the sample rather than
     // integrating a fabricated zero-power period.

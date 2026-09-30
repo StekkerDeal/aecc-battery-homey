@@ -135,8 +135,10 @@ export class AeccSimulator {
     const summary = this.frame.SSumInfoList;
     summary.TotalACChargePower = signedWallW > 0 ? magnitudeW : 0;
     summary.TotalBatteryOutputPower = signedWallW < 0 ? magnitudeW : 0;
-    summary.TotalGridOutputPower =
-      signedWallW > 0 ? -magnitudeW : signedWallW < 0 ? magnitudeW : 0;
+    // Socket output = PV minus battery power, so the energy balance the app
+    // derives equals the power just set, with or without PV in the scenario.
+    const pvW = Number(summary.TotalPVPower ?? 0) || 0;
+    summary.TotalGridOutputPower = pvW - Math.sign(signedWallW) * magnitudeW;
   }
 
   // Overrides exactly the next EnergyParameter poll body, then reverts.

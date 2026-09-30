@@ -4,9 +4,7 @@ export type TelemetryKey =
   | 'battery_soc'
   | 'ac_charging_power'
   | 'battery_discharging_power'
-  | 'battery_charging_power'
   | 'pv_power'
-  | 'pv_charging_power'
   | 'grid_power'
   | 'backup_power'
   | 'pv1_power'
@@ -48,23 +46,8 @@ const FIELD_MAP: Record<TelemetryKey, FieldSpec> = {
     storageScale: 0.1,
     agg: 'sum',
   },
-  // TotalChargePower is DC-side after losses, not the unit sum. Never read it.
-  battery_charging_power: {
-    summaryField: null,
-    summaryScale: 1.0,
-    storageField: 'BatteryChargingPower',
-    storageScale: 0.1,
-    agg: 'sum',
-  },
   pv_power: {
     summaryField: 'TotalPVPower',
-    summaryScale: 1.0,
-    storageField: 'PvChargingPower',
-    storageScale: 0.1,
-    agg: 'sum',
-  },
-  pv_charging_power: {
-    summaryField: 'TotalPVChargePower',
     summaryScale: 1.0,
     storageField: 'PvChargingPower',
     storageScale: 0.1,
@@ -247,21 +230,21 @@ export interface DerivedTelemetry {
   hasStorageList: boolean;
 }
 
+// Energy balance: PV in minus what leaves the socket, so Homey Energy's Home
+// adds up when the PV device counts as solar. TotalGridOutputPower is
+// positive towards the house. Not TotalChargePower: that is cell side, after
+// losses, and 0 while discharging.
+function batteryPowerW(frame: EnergyFrame): number | null {
+  const gridOutputW = toFiniteNumber(frame.SSumInfoList?.TotalGridOutputPower);
+  if (gridOutputW === undefined) return null;
+  return round1((summaryPvPowerW(frame) ?? 0) - gridOutputW);
+}
+
 export function derive(
   frame: EnergyFrame,
   cleanedSoc: number | null
 ): DerivedTelemetry {
-  const chargingPower = systemValue(frame, 'battery_charging_power');
-  const acChargingPower = systemValue(frame, 'ac_charging_power');
-  const dischargingPower = systemValue(frame, 'battery_discharging_power');
-  const hasPowerSignal =
-    chargingPower !== undefined ||
-    acChargingPower !== undefined ||
-    dischargingPower !== undefined;
-  const measurePowerW = hasPowerSignal
-    ? Math.max(chargingPower ?? 0, acChargingPower ?? 0) -
-      (dischargingPower ?? 0)
-    : null;
+  const measurePowerW = batteryPowerW(frame);
   const chargingState =
     measurePowerW === null
       ? null

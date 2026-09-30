@@ -167,7 +167,8 @@ the inconsistency does not follow a simple per-field or per-device rule:
   (confirmed on a Sunpura S2400, where the two sum exactly to `TotalPVPower`;
   see the PV section below).
 - The system-wide `SSumInfoList` summary fields (`TotalACChargePower`,
-  `TotalBatteryOutputPower`, `TotalPVPower`, `MeterTotalActivePower`) are
+  `TotalBatteryOutputPower`, `TotalPVPower`, `TotalGridOutputPower`,
+  `TotalChargePower`, `MeterTotalActivePower`) are
   generally already in watts, **except** `TotalBackUpPower`, which is in
   **10W units** (confirmed against a live load: summary `183.2` against a
   storage-side `1832` under the same ~1830W load). The matching per-unit
@@ -224,6 +225,21 @@ display-only readings when the model reports them, so a firmware that fills
 them is not thrown away. They are kept out of the energy total on purpose:
 where they are filled they sum to `TotalPVPower`, so adding them would count
 the same energy twice.
+
+## Battery power: PV minus what leaves the socket
+
+**Battery power is `TotalPVPower - TotalGridOutputPower`.**
+`TotalGridOutputPower` is the flow at the battery's AC socket: positive
+towards the house, negative when charging from the grid. Subtracting it from
+PV leaves what the battery takes in, so an energy dashboard that counts the
+PV as solar adds up. Without panels it is the socket flow with the sign
+flipped.
+
+The other fields do not do this. Per-unit `BatteryChargingPower` reads 0 in
+every capture, even while charging. `TotalPVChargePower` reads 0 while panels
+alone charge the cells (Sunpura S2400, AFERIY). `TotalChargePower` is the
+cell side after conversion losses, 84 to 95% of the input, and 0 while
+discharging.
 
 ## Security: DeviceManagement exposes credentials
 

@@ -3,6 +3,7 @@ import { AeccSimulator, type Scenario } from '../sim/aecc-simulator';
 import { AeccSession, systemScheduler } from '../../lib/session';
 import lunergyNoStorage from '../fixtures/lunergy-no-storage.json';
 import aegTwoUnit from '../fixtures/aeg-two-unit.json';
+import sunpuraPvOnly from '../fixtures/sunpura-pv-only.json';
 import { FAST_OPTS } from './helpers';
 
 let sim: AeccSimulator | undefined;
@@ -75,7 +76,7 @@ describe('AeccSession against the Lunergy shape (no Storage_list)', () => {
 });
 
 describe('AeccSession against a two-unit AEG Storage_list', () => {
-  it('averages SOC and sums power across the two units', async () => {
+  it('averages SOC across the two units and reads power from the summary', async () => {
     sim = await AeccSimulator.start({
       scenario: aegTwoUnit as unknown as Scenario,
       port: 0,
@@ -99,16 +100,15 @@ describe('AeccSession against a two-unit AEG Storage_list', () => {
     const units = aegTwoUnit.last_poll.Storage_list;
     const socSum = units.reduce((total, unit) => total + unit.BatterySoc, 0);
     const socAvg = socSum / units.length;
-    const powerSum = units.reduce(
-      (total, unit) => total + unit.AcChargingPower * 0.1,
-      0
-    );
+    const summary = aegTwoUnit.last_poll.SSumInfoList;
 
     const snap = session.snapshot;
     expect(snap.telemetry?.unitCount).toBe(2);
     expect(snap.telemetry?.socPct).toBe(socAvg);
     expect(snap.telemetry?.socPct).not.toBe(socSum);
-    expect(snap.telemetry?.measurePowerW).toBe(powerSum);
+    expect(snap.telemetry?.measurePowerW).toBe(
+      summary.TotalPVPower - summary.TotalGridOutputPower
+    );
   }, 10000);
 
   it('writes the AEG slot quirk and schedule mode on a control write', async () => {
@@ -136,5 +136,31 @@ describe('AeccSession against a two-unit AEG Storage_list', () => {
     expect(slot?.split(',')[6]).toBe('0');
     // AEG writes 3 for custom mode instead of the 6 every other brand uses.
     expect(sim.registers.get('3020')).toBe('3');
+  }, 10000);
+});
+
+// Issue #14: panels charging the cells directly, every per-unit charge field 0.
+describe('AeccSession against a Sunpura S2400 charging from its panels', () => {
+  it('reports the panels charging the battery', async () => {
+    sim = await AeccSimulator.start({
+      scenario: sunpuraPvOnly as unknown as Scenario,
+      port: 0,
+    });
+    session = new AeccSession({
+      host: '127.0.0.1',
+      port: sim.port,
+      brand: 'sunpura',
+      limits: { maxChargeW: 2400, maxDischargeW: 800 },
+      scheduler: systemScheduler,
+      pollIntervalMs: 2000,
+      verifyIntervalMs: 0,
+      ...FAST_OPTS,
+    });
+
+    await session.start();
+
+    const telemetry = session.snapshot.telemetry;
+    expect(telemetry?.measurePowerW).toBe(190);
+    expect(telemetry?.chargingState).toBe('charging');
   }, 10000);
 });
