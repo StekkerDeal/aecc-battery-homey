@@ -1,6 +1,6 @@
 {
   "id": "nl.stekkerdeal.aecc",
-  "version": "1.2.2",
+  "version": "1.2.3",
   "compatibility": ">=12.13.0",
   "sdk": 3,
   "platforms": [
