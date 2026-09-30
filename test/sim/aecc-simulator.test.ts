@@ -13,6 +13,7 @@ import {
 } from '../../lib/protocol/frames';
 import { derive, systemValue } from '../../lib/protocol/telemetry';
 import type { EnergyFrame } from '../../lib/types';
+import jetEpsLoad from '../fixtures/jet-eps-load.json';
 import jetSingleUnit from '../fixtures/jet-single-unit.json';
 import sunpuraPvOnly from '../fixtures/sunpura-pv-only.json';
 
@@ -385,6 +386,34 @@ describe('setSoc / setPower / injectRawFrame', () => {
 
     expect(derive(response, null).measurePowerW).toBe(-300);
   });
+
+  it.each([300, -300, 0])(
+    'setPower(%i) drives the derived battery power on a scenario with a backup load',
+    async watts => {
+      // The EPS fixture defines only a frame; its registers come from the JET one.
+      const running = await startSim({
+        scenario: {
+          ...(jetSingleUnit as unknown as Scenario),
+          last_poll: jetEpsLoad.last_poll,
+        } as unknown as Scenario,
+      });
+      running.setPower(watts);
+      const client = await connect(running.port);
+
+      const response = (await client.request(
+        buildGet('EnergyParameter', 1)
+      )) as EnergyFrame & Record<string, unknown>;
+
+      expect(derive(response, null).measurePowerW).toBe(watts);
+      // The per-unit socket flow matches the summary, as on the real device.
+      const unit = expectDefined(
+        (response.Storage_list as Array<Record<string, number>>)[0]
+      );
+      expect(unit.AcInActivePower).toBe(
+        Number(response.SSumInfoList?.TotalGridOutputPower) * 10
+      );
+    }
+  );
 
   it('injectRawFrame overrides exactly the next poll, then reverts', async () => {
     const running = await startSim();

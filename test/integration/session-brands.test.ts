@@ -100,15 +100,12 @@ describe('AeccSession against a two-unit AEG Storage_list', () => {
     const units = aegTwoUnit.last_poll.Storage_list;
     const socSum = units.reduce((total, unit) => total + unit.BatterySoc, 0);
     const socAvg = socSum / units.length;
-    const summary = aegTwoUnit.last_poll.SSumInfoList;
 
     const snap = session.snapshot;
     expect(snap.telemetry?.unitCount).toBe(2);
     expect(snap.telemetry?.socPct).toBe(socAvg);
     expect(snap.telemetry?.socPct).not.toBe(socSum);
-    expect(snap.telemetry?.measurePowerW).toBe(
-      summary.TotalPVPower - summary.TotalGridOutputPower
-    );
+    expect(snap.telemetry?.measurePowerW).toBe(800);
   }, 10000);
 
   it('writes the AEG slot quirk and schedule mode on a control write', async () => {

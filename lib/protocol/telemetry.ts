@@ -230,14 +230,16 @@ export interface DerivedTelemetry {
   hasStorageList: boolean;
 }
 
-// Energy balance: PV in minus what leaves the socket, so Homey Energy's Home
-// adds up when the PV device counts as solar. TotalGridOutputPower is
+// Energy balance: PV in minus what leaves the socket and the backup socket,
+// so Homey Energy's Home adds up when the PV device counts as solar. A backup
+// load is fed through from the grid, not charged. TotalGridOutputPower is
 // positive towards the house. Not TotalChargePower: that is cell side, after
 // losses, and 0 while discharging.
 function batteryPowerW(frame: EnergyFrame): number | null {
   const gridOutputW = toFiniteNumber(frame.SSumInfoList?.TotalGridOutputPower);
   if (gridOutputW === undefined) return null;
-  return round1((summaryPvPowerW(frame) ?? 0) - gridOutputW);
+  const backupW = systemValue(frame, 'backup_power') ?? 0;
+  return round1((summaryPvPowerW(frame) ?? 0) - gridOutputW - backupW);
 }
 
 export function derive(

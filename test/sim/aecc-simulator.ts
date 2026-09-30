@@ -1,5 +1,6 @@
 import * as net from 'node:net';
-import type { StorageUnit } from '../../lib/types';
+import type { EnergyFrame, StorageUnit } from '../../lib/types';
+import { summaryPvPowerW, systemValue } from '../../lib/protocol/telemetry';
 import { DEVICE_MANAGEMENT_SAFE_REGISTERS } from '../../lib/protocol/registers';
 
 const SAFE_DM_REGISTERS = new Set<number>(DEVICE_MANAGEMENT_SAFE_REGISTERS);
@@ -109,12 +110,22 @@ export class AeccSimulator {
     this.frame.SSumInfoList.AverageBatteryAverageSOC = pct;
   }
 
-  // Wall-side power: positive charges, negative discharges. Storage fields
+  // Battery power: positive charges, negative discharges. Storage fields
   // are deciwatts (x10) and SSumInfoList fields are watts (x1), the same
   // mixed scaling the real device uses, so the two stay consistent.
   setPower(signedWallW: number): void {
     const magnitudeW = Math.round(Math.abs(signedWallW));
     const magnitudeDw = magnitudeW * 10;
+    if (!this.frame.SSumInfoList) this.frame.SSumInfoList = {};
+    const summary = this.frame.SSumInfoList;
+    // Socket output = PV minus the backup load minus battery power, so the
+    // energy balance the app derives equals the power just set, whatever PV
+    // or backup load the scenario carries.
+    const frame = this.frame as EnergyFrame;
+    const pvW = summaryPvPowerW(frame) ?? 0;
+    const backupW = systemValue(frame, 'backup_power') ?? 0;
+    const socketW = pvW - backupW - Math.sign(signedWallW) * magnitudeW;
+
     const units = this.frame.Storage_list ?? [];
     for (const unit of units) {
       unit.AcChargingPower = 0;
@@ -123,22 +134,13 @@ export class AeccSimulator {
     }
     const primary = units[0];
     if (primary) {
-      if (signedWallW > 0) {
-        primary.AcChargingPower = magnitudeDw;
-        primary.AcInActivePower = -magnitudeDw;
-      } else if (signedWallW < 0) {
-        primary.BatteryDischargingPower = magnitudeDw;
-        primary.AcInActivePower = magnitudeDw;
-      }
+      if (signedWallW > 0) primary.AcChargingPower = magnitudeDw;
+      else if (signedWallW < 0) primary.BatteryDischargingPower = magnitudeDw;
+      primary.AcInActivePower = socketW * 10;
     }
-    if (!this.frame.SSumInfoList) this.frame.SSumInfoList = {};
-    const summary = this.frame.SSumInfoList;
     summary.TotalACChargePower = signedWallW > 0 ? magnitudeW : 0;
     summary.TotalBatteryOutputPower = signedWallW < 0 ? magnitudeW : 0;
-    // Socket output = PV minus battery power, so the energy balance the app
-    // derives equals the power just set, with or without PV in the scenario.
-    const pvW = Number(summary.TotalPVPower ?? 0) || 0;
-    summary.TotalGridOutputPower = pvW - Math.sign(signedWallW) * magnitudeW;
+    summary.TotalGridOutputPower = socketW;
   }
 
   // Overrides exactly the next EnergyParameter poll body, then reverts.

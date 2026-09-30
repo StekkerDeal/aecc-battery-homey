@@ -226,9 +226,9 @@ them is not thrown away. They are kept out of the energy total on purpose:
 where they are filled they sum to `TotalPVPower`, so adding them would count
 the same energy twice.
 
-## Battery power: PV minus what leaves the socket
+## Battery power: PV minus what leaves the sockets
 
-**Battery power is `TotalPVPower - TotalGridOutputPower`.**
+**Battery power is `TotalPVPower - TotalGridOutputPower - backup power`.**
 `TotalGridOutputPower` is the flow at the battery's AC socket: positive
 towards the house, negative when charging from the grid. Subtracting it from
 PV leaves what the battery takes in, so an energy dashboard that counts the
@@ -240,6 +240,10 @@ every capture, even while charging. `TotalPVChargePower` reads 0 while panels
 alone charge the cells (Sunpura S2400, AFERIY). `TotalChargePower` is the
 cell side after conversion losses, 84 to 95% of the input, and 0 while
 discharging.
+
+A load on the EPS/backup socket is fed through from the grid and is not
+charging, so backup power is subtracted too: `TotalBackUpPower` x10 (the x10
+is confirmed on a JET only), else the per-unit `OffGridLoadPower` sum.
 
 ## Security: DeviceManagement exposes credentials
 

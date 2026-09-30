@@ -10,6 +10,7 @@ import {
   wallPowerSignalW,
 } from './telemetry';
 import aegTwoUnit from '../../test/fixtures/aeg-two-unit.json';
+import jetEpsLoad from '../../test/fixtures/jet-eps-load.json';
 import jetSingleUnit from '../../test/fixtures/jet-single-unit.json';
 import pvGenerating from '../../test/fixtures/pv-generating.json';
 import sunpuraPvAndAc from '../../test/fixtures/sunpura-pv-and-ac.json';
@@ -263,8 +264,9 @@ describe('derive', () => {
     ['JET on AC', jetSingleUnit, 798, 'charging'],
     ['AEG two units on AC', aegTwoUnit, 800, 'charging'],
     ['TSUN discharging', tsunDischarging, -547, 'discharging'],
+    ['JET with a heater on its backup socket', jetEpsLoad, 9, 'idle'],
   ] as const)(
-    'computes battery power as PV minus socket output: %s',
+    'computes battery power as PV minus socket and backup output: %s',
     (_name, fixture, watts, state) => {
       const result = derive(fixture.last_poll as unknown as EnergyFrame, 50);
       expect(result.measurePowerW).toBe(watts);
@@ -296,6 +298,22 @@ describe('derive', () => {
   it('counts a missing TotalPVPower as no panels', () => {
     const frame: EnergyFrame = { SSumInfoList: { TotalGridOutputPower: 400 } };
     expect(derive(frame, 50).measurePowerW).toBe(-400);
+  });
+
+  it('prefers the summary backup field over OffGridLoadPower', () => {
+    const frame: EnergyFrame = {
+      Storage_list: [{ OffGridLoadPower: 900 }],
+      SSumInfoList: { TotalGridOutputPower: -500, TotalBackUpPower: 40 },
+    };
+    expect(derive(frame, 50).measurePowerW).toBe(100);
+  });
+
+  it('takes the backup load from OffGridLoadPower without a summary field', () => {
+    const frame: EnergyFrame = {
+      Storage_list: [{ OffGridLoadPower: 400 }],
+      SSumInfoList: { TotalGridOutputPower: -500 },
+    };
+    expect(derive(frame, 50).measurePowerW).toBe(100);
   });
 
   it('has no battery power without TotalGridOutputPower', () => {
