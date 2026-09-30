@@ -20,6 +20,7 @@
     "nl": "Nieuw: de onderhoudsactie Diagnostics naar log schrijven op de batterij, zodat je precies kunt doorsturen wat je batterij doorgeeft als er iets niet klopt. Serienummers en het IP-adres worden eerst verwijderd. Verbindingsfouten komen nu ook in het app-log terecht, zonder IP-adres, en een lange storing schrijft het log niet meer vol."
   },
   "1.2.2": {
-    "en": "Fixed: battery power now includes charging straight from panels connected to the battery, so Homey Energy no longer counts that solar twice. If panels are connected to your battery, add the AECC PV input device. The discharged total now counts exactly what reaches your home."
+    "en": "Fixed: battery power now includes charging straight from panels connected to the battery, so Homey Energy no longer counts that solar twice. If panels are connected to your battery, add the AECC PV input device. The discharged total now counts exactly what reaches your home.",
+    "nl": "Opgelost: het batterijvermogen telt nu ook laden direct vanaf panelen op de batterij mee, zodat Homey Energie die zonne-energie niet meer dubbel telt. Zitten er panelen op je batterij, voeg dan het apparaat AECC PV-ingang toe. Het ontladen totaal telt nu precies wat er bij je huis aankomt."
   }
 }
