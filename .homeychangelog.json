@@ -18,5 +18,8 @@
   "1.2.1": {
     "en": "New: a Write diagnostics to log maintenance action on the battery, so you can send exactly what your battery reports when something looks wrong. Serial numbers and the IP address are removed first. Connection errors now also reach the app log, without the IP address, and a long outage no longer fills the log.",
     "nl": "Nieuw: de onderhoudsactie Diagnostics naar log schrijven op de batterij, zodat je precies kunt doorsturen wat je batterij doorgeeft als er iets niet klopt. Serienummers en het IP-adres worden eerst verwijderd. Verbindingsfouten komen nu ook in het app-log terecht, zonder IP-adres, en een lange storing schrijft het log niet meer vol."
+  },
+  "1.2.2": {
+    "en": "Fixed: battery power now includes charging straight from panels connected to the battery, so Homey Energy no longer counts that solar twice. If panels are connected to your battery, add the AECC PV input device. The discharged total now counts exactly what reaches your home."
   }
 }
