@@ -128,7 +128,7 @@ A master/slave stack pairs as **one** Homey device, pointed at the master's IP. 
 
 **Manual control reaches the master only.** The AECC local protocol has no per-unit control, and the master does not forward a locally written setpoint to the other units. On a paired stack the secondary keeps executing whatever schedule the vendor app last gave it. This was established on two AEG Solarcube stacks in [aecc-battery-local#16](https://github.com/StekkerDeal/aecc-battery-local/issues/16): every register the integration writes is confirmed applied and matches the state the app leaves behind, yet only the master responds. The app drives the other units through the cloud, which this app deliberately does not use. Totals of the whole stack are unaffected.
 
-**If you need to control both units**, register each battery separately in the vendor app instead of pairing them, so each gets its own IP and answers on port 8080. Pair each as its own Homey device and let your flows send each one its share of the target.
+**If you need to control both units**, register each battery on its own vendor account instead of pairing them, so each gets its own IP and answers on port 8080 ([aecc-battery-local#16](https://github.com/StekkerDeal/aecc-battery-local/issues/16)). Pair each as its own Homey device and let your flows send each one its share of the target.
 
 Keep both units in **Homey control** with your flows as the only thing deciding power. Never leave two separately registered units in Self-consumption (AI) on the same meter: each tries to zero the same reading without knowing the other exists, and they end up charging and discharging against each other at full power ([#2](https://github.com/StekkerDeal/aecc-battery-homey/issues/2)).
 
