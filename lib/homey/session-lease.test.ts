@@ -9,7 +9,8 @@ import type {
 } from '../session';
 import type { AeccDeviceSettings } from './device-settings';
 
-type OnEventFn = (event: SessionEvent) => void;
+type OnEventFn = (event: SessionEvent) => void | Promise<void>;
+type OnEventErrorFn = (error: unknown, event: SessionEvent) => void;
 type CreateSessionFn = (settings: AeccDeviceSettings) => AeccSession;
 type UnsubscribeFn = () => void;
 type SubscribeFn = (listener: OnEventFn) => UnsubscribeFn;
@@ -107,17 +108,20 @@ function createFakeScheduler(): {
 function createLease(options: {
   registry: SessionRegistry;
   onEvent?: Mock<OnEventFn>;
+  onEventError?: Mock<OnEventErrorFn>;
   createSession?: Mock<CreateSessionFn>;
   jitterMs?: () => number;
 }): {
   lease: SessionLease;
   onEvent: Mock<OnEventFn>;
+  onEventError: Mock<OnEventErrorFn>;
   createSession: Mock<CreateSessionFn>;
   calls: ScheduledCall[];
   fire: (call: ScheduledCall | undefined) => void;
 } {
   const { scheduler, calls, fire } = createFakeScheduler();
   const onEvent = options.onEvent ?? vi.fn<OnEventFn>();
+  const onEventError = options.onEventError ?? vi.fn<OnEventErrorFn>();
   const createSession =
     options.createSession ??
     vi.fn<CreateSessionFn>(() => asSession(fakeSession()));
@@ -126,9 +130,10 @@ function createLease(options: {
     scheduler,
     createSession,
     onEvent,
+    onEventError,
     jitterMs: options.jitterMs ?? (() => 0),
   });
-  return { lease, onEvent, createSession, calls, fire };
+  return { lease, onEvent, onEventError, createSession, calls, fire };
 }
 
 describe('SessionLease', () => {
@@ -206,6 +211,74 @@ describe('SessionLease', () => {
     });
   });
 
+  // The 1.2.0 crash reports: a device deleted while an event was in flight
+  // rejected with "Not Found", nothing caught it, and Homey killed the app.
+  // Vitest fails a test on an unhandled rejection, so these also prove none
+  // escapes.
+  describe('event handler failures', () => {
+    it('reports a handler that rejects to onEventError with the event, instead of leaving the rejection unhandled', async () => {
+      const registry = new SessionRegistry();
+      const failure = new Error('Not Found: Device with ID abc');
+      const onEvent = vi.fn<OnEventFn>().mockRejectedValue(failure);
+      const { lease, onEventError } = createLease({ registry, onEvent });
+      const outcome = await lease.acquire(buildSettings());
+      const event: SessionEvent = { type: 'available' };
+
+      toFake(outcome.session).emit(event);
+
+      await vi.waitFor(() => {
+        expect(onEventError).toHaveBeenCalledWith(failure, event);
+      });
+    });
+
+    it('reports a handler that throws synchronously, and the session emit does not throw', async () => {
+      const registry = new SessionRegistry();
+      const failure = new Error('boom');
+      const onEvent = vi.fn<OnEventFn>(() => {
+        throw failure;
+      });
+      const { lease, onEventError } = createLease({ registry, onEvent });
+      const outcome = await lease.acquire(buildSettings());
+      const event: SessionEvent = { type: 'available' };
+
+      expect(() => toFake(outcome.session).emit(event)).not.toThrow();
+      expect(onEventError).toHaveBeenCalledWith(failure, event);
+    });
+
+    it('keeps delivering later events after a handler has failed', async () => {
+      const registry = new SessionRegistry();
+      const onEvent = vi
+        .fn<OnEventFn>()
+        .mockRejectedValueOnce(new Error('first fails'))
+        .mockResolvedValue(undefined);
+      const { lease, onEventError } = createLease({ registry, onEvent });
+      const outcome = await lease.acquire(buildSettings());
+      const fake = toFake(outcome.session);
+
+      fake.emit({ type: 'unavailable', reason: 'test' });
+      fake.emit({ type: 'available' });
+
+      await vi.waitFor(() => {
+        expect(onEventError).toHaveBeenCalledTimes(1);
+      });
+      expect(onEvent).toHaveBeenCalledTimes(2);
+      expect(onEvent).toHaveBeenLastCalledWith({ type: 'available' });
+    });
+
+    it('does not call onEventError for a handler that succeeds', async () => {
+      const registry = new SessionRegistry();
+      const onEvent = vi.fn<OnEventFn>().mockResolvedValue(undefined);
+      const { lease, onEventError } = createLease({ registry, onEvent });
+      const outcome = await lease.acquire(buildSettings());
+
+      toFake(outcome.session).emit({ type: 'available' });
+      await Promise.resolve();
+
+      expect(onEvent).toHaveBeenCalledTimes(1);
+      expect(onEventError).not.toHaveBeenCalled();
+    });
+  });
+
   describe('starting', () => {
     it('schedules a start at index * 1000 + jitter, and only calls session.start() once the fake scheduler fires it', async () => {
       const registry = new SessionRegistry();
@@ -267,6 +340,17 @@ describe('SessionLease', () => {
       expect(lease.key).toBe('');
       expect(fake.stop).toHaveBeenCalledTimes(1);
       expect(registry.size).toBe(0);
+    });
+
+    it('stops delivering events to onEvent once released', async () => {
+      const registry = new SessionRegistry();
+      const { lease, onEvent } = createLease({ registry });
+      const outcome = await lease.acquire(buildSettings());
+
+      await lease.release();
+      toFake(outcome.session).emit({ type: 'available' });
+
+      expect(onEvent).not.toHaveBeenCalled();
     });
 
     it('does not stop the session while a second lease still references it, and stops it on the second release', async () => {

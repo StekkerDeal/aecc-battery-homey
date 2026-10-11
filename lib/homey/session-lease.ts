@@ -11,7 +11,13 @@ export interface SessionLeaseDeps {
   registry: SessionRegistry;
   scheduler: Scheduler;
   createSession: (settings: AeccDeviceSettings) => AeccSession;
-  onEvent: (event: SessionEvent) => void;
+  onEvent: (event: SessionEvent) => void | Promise<void>;
+  // Where a failing onEvent ends up. The session calls its listeners
+  // synchronously and ignores what they return, so without this a handler
+  // that rejects is an unhandled rejection, and Homey kills the whole app for
+  // it. The common case is a device deleted while an event is in flight:
+  // every write to it then fails with "Not Found".
+  onEventError: (error: unknown, event: SessionEvent) => void;
   // Injectable so a test can assert the stagger without waiting on chance.
   jitterMs?: () => number;
 }
@@ -44,7 +50,8 @@ const DEFAULT_JITTER_MS = 250;
  *  - a pending start is always cancelled with the reference it belongs to,
  *    because a timer that fires after release starts a session nobody is
  *    tracking, which then holds the battery's only slot;
- *  - only the creator starts the session, staggered by registry index.
+ *  - only the creator starts the session, staggered by registry index;
+ *  - a failing event handler is reported, never left to crash the app.
  */
 export class SessionLease {
   private readonly deps: SessionLeaseDeps;
@@ -101,7 +108,7 @@ export class SessionLease {
 
     this.sessionValue = session;
     this.keyValue = key;
-    this.unsubscribe = session.subscribe(this.deps.onEvent);
+    this.unsubscribe = session.subscribe(event => this.deliver(event));
     this.scheduleStart(created, session, index);
 
     return { session, created, index };
@@ -119,6 +126,20 @@ export class SessionLease {
     this.keyValue = '';
 
     await this.deps.registry.release(key);
+  }
+
+  // Synchronous on purpose, so events still reach the device in the order
+  // the session emitted them. Only the failure is routed elsewhere, whether
+  // the handler throws or rejects.
+  private deliver(event: SessionEvent): void {
+    try {
+      const result = this.deps.onEvent(event);
+      if (result instanceof Promise) {
+        result.catch((error: unknown) => this.deps.onEventError(error, event));
+      }
+    } catch (error) {
+      this.deps.onEventError(error, event);
+    }
   }
 
   private scheduleStart(

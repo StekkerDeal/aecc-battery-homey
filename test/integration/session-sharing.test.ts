@@ -74,6 +74,11 @@ function deviceSide(reg: SessionRegistry): LeaseSide {
     onEvent: (event: SessionEvent) => {
       if (event.type === 'snapshot') snapshots.push(event.snapshot);
     },
+    // Nothing above can fail, so anything reaching here is a bug in the
+    // suite: rethrow it rather than let it pass silently.
+    onEventError: error => {
+      throw error;
+    },
   });
   return { lease, snapshots };
 }

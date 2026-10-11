@@ -24,6 +24,7 @@ import {
   type RawSettings,
 } from '../../lib/homey/device-settings';
 import type { PvFollower } from '../../lib/homey/pv-link';
+import { describeError } from '../../lib/logger';
 
 const METER_STORE_KEY = 'pvEnergyMeter';
 
@@ -59,9 +60,12 @@ export default class AeccPvDevice extends Homey.Device implements PvFollower {
       registry: sessionHost(this.homey.app).sessions,
       scheduler: this.scheduler(),
       createSession: settings => this.createSession(settings),
-      onEvent: event => {
-        void this.handleSessionEvent(event);
-      },
+      onEvent: event => this.handleSessionEvent(event),
+      onEventError: (error, event) =>
+        this.error(
+          `Handling the session's ${event.type} event failed:`,
+          describeError(error)
+        ),
     });
 
     // Before the battery lookup, so a device whose link is broken still
@@ -315,8 +319,11 @@ export default class AeccPvDevice extends Homey.Device implements PvFollower {
     this.lastPersistedAtMs = Date.now();
   }
 
+  // No meter save here, for the same reason as on the battery device: on
+  // delete the device is already gone, and on shutdown the SDK has destroyed
+  // its message channel before calling onUninit, so the write cannot succeed.
+  // maybePersistMeter and the unavailable handler save it while running.
   private async teardown(): Promise<void> {
-    await this.persistMeter();
     // Through the chain, so a teardown landing while the battery is mid
     // repair cannot release a reference the reattach is still taking.
     this.inFlight = this.inFlight.then(() => this.lease.release());

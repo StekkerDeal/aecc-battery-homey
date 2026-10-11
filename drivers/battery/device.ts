@@ -93,9 +93,12 @@ export default class AeccDevice extends Homey.Device implements AeccFlowDevice {
       registry: sessionHost(this.homey.app).sessions,
       scheduler: this.scheduler(),
       createSession: s => this.createSession(s),
-      onEvent: event => {
-        void this.handleSessionEvent(event);
-      },
+      onEvent: event => this.handleSessionEvent(event),
+      onEventError: (error, event) =>
+        this.error(
+          `Handling the session's ${event.type} event failed:`,
+          describeError(error)
+        ),
     });
     await this.lease.acquire(settings);
 
@@ -427,11 +430,17 @@ export default class AeccDevice extends Homey.Device implements AeccFlowDevice {
     this.lastPersistedAtMs = Date.now();
   }
 
+  // No meter save here: it cannot succeed on either path that gets here. On
+  // delete Homey has already removed the device, so the store write fails
+  // with "Not Found". On shutdown the SDK destroys its message channel before
+  // calling onUninit, so every write fails with "app instance has been
+  // destroyed". The meter is saved while running instead, by
+  // maybePersistMeter and on unavailable.
+  //
+  // The SDK calls onUninit after onDeleted, and the lease blanks its own key,
+  // so the second release is a no-op rather than dropping the refcount of a
+  // session another device is still using.
   private async teardown(): Promise<void> {
-    await this.persistMeter();
-    // The lease blanks its own key, so onDeleted followed by onUninit
-    // releases once rather than dropping the refcount of a session another
-    // device is still using.
     await this.lease.release();
   }
 
