@@ -26,5 +26,8 @@
   "1.2.3": {
     "en": "Fixed: a device plugged into the battery's backup socket no longer shows up as the battery charging.",
     "nl": "Opgelost: een apparaat in het noodstroomstopcontact van de batterij telt niet langer als laden van de batterij."
+  },
+  "1.2.4": {
+    "en": "Fixed: the app no longer crashes when a battery or PV device is removed while it is still updating."
   }
 }
