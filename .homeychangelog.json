@@ -28,6 +28,7 @@
     "nl": "Opgelost: een apparaat in het noodstroomstopcontact van de batterij telt niet langer als laden van de batterij."
   },
   "1.2.4": {
-    "en": "Fixed: the app no longer crashes when a battery or PV device is removed while it is still updating."
+    "en": "Fixed: the app no longer crashes when a battery or PV device is removed while it is still updating.",
+    "nl": "Opgelost: de app crasht niet meer als je een batterij of PV-ingang verwijdert terwijl die nog bijwerkt."
   }
 }
