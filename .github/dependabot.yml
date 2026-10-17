@@ -11,6 +11,11 @@ updates:
       prefix: 'chore'
     open-pull-requests-limit: 5
     groups:
+      # vitest and its plugins pin each other's exact version, so they
+      # have to move in one PR. Listed first because the first matching
+      # group wins.
+      vitest:
+        patterns: ['vitest', '@vitest/*']
       minor-and-patch:
         patterns: ['*']
         update-types: ['minor', 'patch']
