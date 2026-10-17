@@ -1,5 +1,7 @@
 ## Related Issue
 
+<!-- A feature or behaviour change needs an issue we agreed on first, see CONTRIBUTING.md. -->
+
 Closes #<!-- issue number -->
 
 ## Summary
@@ -14,7 +16,7 @@ Closes #<!-- issue number -->
 
 - [ ] Tests pass (`.\scripts\check.ps1`)
 - [ ] `app.json` regenerated and committed if `.homeycompose` changed
-- [ ] Version bumped through the version workflow, not by hand
+- [ ] No version bump, we handle versions and releases
 - [ ] README updated if capabilities, flow cards or behaviour changed
 - [ ] Translations updated for `en` and `nl` if user-visible strings changed
 - [ ] No secrets, no real device serial numbers, no WiFi credentials in code or logs
